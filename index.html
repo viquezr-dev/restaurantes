@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingreso por Corregimiento - Panamá</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",Tahoma,sans-serif;background:#eef2f5;color:#1f2937}
+#map{width:100%;height:100vh}
+.panel{position:absolute;z-index:1000;top:12px;right:12px;width:350px;max-height:95vh;overflow:auto;background:rgba(255,255,255,.97);padding:14px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.18)}
+.header{border-bottom:2px solid #2c6b9e;padding-bottom:8px;margin-bottom:10px}
+.header h3{font-size:15px}.header small{color:#64748b}
+label{font-size:10px;font-weight:700;display:block;margin:7px 0 3px}
+select,button{width:100%;padding:6px 8px;border-radius:6px;border:1px solid #d5dbe3;font-size:10px}
+select{background:#fff}
+.row{display:flex;gap:5px;margin-top:7px}.row button{cursor:pointer;font-weight:700;border:none}
+.btn-sat{background:#2c6b9e;color:white}.btn-street{background:#e5e7eb}.btn-reset{background:#dc3545;color:white}.btn-chart{background:#6f42c1;color:white}
+.box{margin-top:9px;background:#f8fafc;border-left:3px solid #2c6b9e;border-radius:7px;padding:9px}
+.box h4{font-size:12px;margin-bottom:7px}
+.identity{font-size:10px;line-height:1.55}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.card{background:#fff;border:1px solid #e3e8ef;border-radius:8px;padding:7px;text-align:center}
+.card span{display:block;font-size:8px;color:#64748b}.card strong{display:block;font-size:14px;margin-top:2px}
+.money strong{color:#176b45}
+.quality{margin-top:8px;padding:8px;border-radius:7px;background:#eef6ff;font-size:9px;line-height:1.5}
+.bar{height:8px;background:#e5e7eb;border-radius:6px;overflow:hidden;margin-top:5px}.bar>div{height:100%;background:#2c6b9e}
+.legend{position:absolute;z-index:900;bottom:28px;left:12px;background:rgba(255,255,255,.95);padding:9px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-size:9px;line-height:1.5}
+.legend i{display:inline-block;width:13px;height:10px;margin-right:5px}
+.footer{position:absolute;z-index:900;bottom:7px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.72);color:#fff;padding:4px 14px;border-radius:15px;font-size:9px}
+.loading{position:absolute;z-index:2000;left:50%;top:50%;transform:translate(-50%,-50%);background:white;padding:22px 30px;border-radius:12px;box-shadow:0 5px 25px rgba(0,0,0,.25);font-size:12px}
+.modal{display:none;position:fixed;z-index:3000;inset:0;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
+.modal.active{display:flex}.modal-content{background:white;width:90%;max-width:760px;padding:20px;border-radius:14px}.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.modal-head button{width:auto;border:none;background:none;font-size:22px;cursor:pointer}
+canvas{max-height:420px}
+.leaflet-tooltip{font-size:11px}
+.restaurant-icon{background:#fff;border:2px solid #d97706;border-radius:50%;width:12px!important;height:12px!important;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.market-card{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px;font-size:9px;line-height:1.55}
+.market-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.market-item{background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid #ffedd5}
+.market-item span{display:block;color:#78716c;font-size:8px}.market-item strong{font-size:13px;color:#9a3412}
+@media(max-width:600px){.panel{width:245px;top:6px;right:6px}.cards{grid-template-columns:1fr}.legend{display:none}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="loading" id="loading">Cargando <b>ingreso_corr.geojson</b> y <b>restaurantes.geojson</b>...</div>
+
+<div class="panel">
+ <div class="header"><h3>💰 Ingreso por corregimiento</h3><small>Panamá · análisis de ingresos declarados</small></div>
+ <label>Provincia</label><select id="prov"><option value="">Todas las provincias</option></select>
+ <label>Distrito</label><select id="dist" disabled><option value="">Seleccionar distrito...</option></select>
+ <label>Corregimiento</label><select id="corr" disabled><option value="">Seleccionar corregimiento...</option></select>
+ <div class="row">
+   <button class="btn-sat" id="sat">🛰️ Satélite</button>
+   <button class="btn-street" id="street">🌍 Callejero</button>
+   <button class="btn-street" id="restToggle">🍽️ Restaurantes</button>
+ </div>
+ <div class="row">
+   <button class="btn-chart" id="chartBtn" disabled>📊 Gráfica</button>
+   <button class="btn-reset" id="reset">🔄 Reset</button>
+ </div>
+ <div class="box">
+  <h4>📋 Estadísticas del corregimiento</h4>
+  <div id="info" class="identity">Selecciona un corregimiento en el menú o haz clic sobre un polígono.</div>
+ </div>
+</div>
+
+<div class="legend">
+<b>Ingreso mediano</b><br>
+<i style="background:#d9f0d3"></i> Menor ingreso<br>
+<i style="background:#78c679"></i> Intermedio<br>
+<i style="background:#238443"></i> Mayor ingreso<br>
+<span style="color:#64748b">Clasificación relativa según los datos cargados.</span>
+</div>
+<div class="footer">Ingreso declarado por corregimiento · INGR_PER = 0 se considera no declarado</div>
+
+<div class="modal" id="modal">
+ <div class="modal-content">
+  <div class="modal-head"><div><b id="chartTitle">Estadísticas de ingreso</b><div id="chartSub" style="font-size:10px;color:#64748b"></div></div><button id="close">×</button></div>
+  <canvas id="chart"></canvas>
+ </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map',{center:[8.5,-80],zoom:7});
+const base={
+ satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri',maxZoom:19}),
+ street:L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:19})
+};
+base.satellite.addTo(map);
+
+let data=null, restaurantData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null;
+let restaurantesVisibles=true;
+const $=id=>document.getElementById(id);
+const code=v=>String(v??'').trim();
+const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
+const fmtN=v=>num(v)===null?'—':new Intl.NumberFormat('es-PA',{maximumFractionDigits:0}).format(Number(v));
+const fmtPct=v=>num(v)===null?'—':Number(v).toLocaleString('es-PA',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+const fmtMoney=v=>num(v)===null?'—':'B/. '+Number(v).toLocaleString('es-PA',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+let minMed=0,maxMed=1;
+function colorMed(v){
+ const x=num(v); if(x===null)return '#cbd5e1';
+ const t=Math.max(0,Math.min(1,(x-minMed)/(maxMed-minMed||1)));
+ if(t<.2)return '#d9f0d3'; if(t<.4)return '#addd8e'; if(t<.6)return '#78c679'; if(t<.8)return '#41ab5d'; return '#238443';
+}
+function style(f){return{color:'#374151',weight:1.2,fillColor:colorMed(f.properties.ING_MED),fillOpacity:.68}}
+
+function unique(field,filter=()=>true){
+ const m=new Map();
+ data.features.filter(filter).forEach(f=>{const p=f.properties,k=code(p[field]);if(k&&!m.has(k))m.set(k,p)});
+ return [...m.values()];
+}
+function fill(sel,rows,valueField,nameField,prefixLen){
+ sel.innerHTML='<option value="">Seleccionar...</option>';
+ rows.sort((a,b)=>code(a[valueField]).localeCompare(code(b[valueField]),'es',{numeric:true})).forEach(p=>{
+  const o=document.createElement('option');o.value=code(p[valueField]);
+  const local=prefixLen?code(p[valueField]).slice(-prefixLen):code(p[valueField]);
+  o.textContent=local+' - '+(p[nameField]||'Sin nombre');sel.appendChild(o);
+ });
+ sel.disabled=false;
+}
+function populateProvinces(){
+ const rows=unique('PROV_ID'); $('prov').innerHTML='<option value="">Todas las provincias</option>';
+ rows.sort((a,b)=>code(a.PROV_ID).localeCompare(code(b.PROV_ID),'es',{numeric:true})).forEach(p=>{
+  const o=document.createElement('option');o.value=code(p.PROV_ID);o.textContent=code(p.PROV_ID).padStart(2,'0')+' - '+p.PROV_NOMB;$('prov').appendChild(o);
+ });
+}
+function render(features=data.features,fit=true){
+ if(layer)map.removeLayer(layer);
+ layer=L.geoJSON({type:'FeatureCollection',features},{
+  style,
+  onEachFeature:(f,l)=>{
+   const p=f.properties;
+   l.bindTooltip(`<b>${p.CORR_NOMB||'Corregimiento'}</b><br>Mediana: ${fmtMoney(p.ING_MED)}<br>Respuesta: ${fmtPct(p.PCT_RESP)}`);
+   l.on('click',()=>selectFeature(f,l,true));
+   l.on('mouseover',function(){if(this!==selectedLayer)this.setStyle({weight:2.5,fillOpacity:.82})});
+   l.on('mouseout',function(){if(this!==selectedLayer)this.setStyle(style(f))});
+  }
+ }).addTo(map);
+ if(fit&&features.length){const b=layer.getBounds();if(b.isValid())map.fitBounds(b,{padding:[25,25]})}
+}
+function selectFeature(f,l,fromMap=false){
+ if(selectedLayer)selectedLayer.setStyle(style(selectedFeature));
+ selectedFeature=f; selectedLayer=l||null;
+ if(selectedLayer)selectedLayer.setStyle({color:'#ff6b35',weight:4,fillOpacity:.82});
+ const p=f.properties;
+ $('info').innerHTML=`
+ <div><b>${p.CORR_NOMB||'Sin nombre'}</b></div>
+ <div>${p.DIST_NOMB||''} · ${p.PROV_NOMB||''}</div>
+ <div>Código: <b>${p.CORR_CODE||''}</b></div>
+ <div class="cards">
+  <div class="card"><span>Personas encuestadas</span><strong>${fmtN(p.N_TOTAL)}</strong></div>
+  <div class="card"><span>Ingresos válidos</span><strong>${fmtN(p.N_VALIDOS)}</strong></div>
+  <div class="card"><span>No declararon</span><strong>${fmtN(p.N_NO_DECL)}</strong></div>
+  <div class="card"><span>Respuesta</span><strong>${fmtPct(p.PCT_RESP)}</strong></div>
+  <div class="card money"><span>Ingreso promedio</span><strong>${fmtMoney(p.ING_PROM)}</strong></div>
+  <div class="card money"><span>Ingreso mediano</span><strong>${fmtMoney(p.ING_MED)}</strong></div>
+  <div class="card money"><span>Ingreso mínimo</span><strong>${fmtMoney(p.ING_MIN)}</strong></div>
+  <div class="card money"><span>Ingreso máximo</span><strong>${fmtMoney(p.ING_MAX)}</strong></div>
+ </div>
+ <div class="quality"><b>Cobertura de respuesta</b>: ${fmtPct(p.PCT_RESP)}
+ <div class="bar"><div style="width:${Math.max(0,Math.min(100,num(p.PCT_RESP)||0))}%"></div></div>
+ ${fmtN(p.N_VALIDOS)} de ${fmtN(p.N_TOTAL)} personas declararon un ingreso. Los registros con ingreso 0 no se usan en promedio, mediana, mínimo ni máximo.</div>
+ ${marketHtml(f)}`;
+ const restCorr=restaurantsForCorr(f);
+ renderRestaurants(restCorr);
+ $('chartBtn').disabled=false;
+ if(fromMap){
+   $('prov').value=code(p.PROV_ID); loadDistricts();
+   $('dist').value=code(p.DIST_CODE); loadCorrs();
+   $('corr').value=code(p.CORR_CODE);
+ }
+ const b=L.geoJSON(f).getBounds();if(b.isValid())map.fitBounds(b,{padding:[45,45],maxZoom:12});
+}
+function loadDistricts(){
+ const pv=$('prov').value;$('dist').disabled=true;$('corr').disabled=true;
+ $('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
+ if(!pv){render();return}
+ fill($('dist'),unique('DIST_CODE',f=>code(f.properties.PROV_ID)===pv),'DIST_CODE','DIST_NOMB',2);
+ render(data.features.filter(f=>code(f.properties.PROV_ID)===pv));
+}
+function loadCorrs(){
+ const d=$('dist').value;$('corr').disabled=true;$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
+ if(!d){loadDistricts();return}
+ fill($('corr'),unique('CORR_CODE',f=>code(f.properties.DIST_CODE)===d),'CORR_CODE','CORR_NOMB',2);
+ render(data.features.filter(f=>code(f.properties.DIST_CODE)===d));
+}
+function chooseCorr(){
+ const c=$('corr').value;if(!c){loadCorrs();return}
+ const f=data.features.find(x=>code(x.properties.CORR_CODE)===c);if(!f)return;
+ let target=null;layer.eachLayer(l=>{if(code(l.feature.properties.CORR_CODE)===c)target=l});selectFeature(f,target,false);
+}
+
+function pointInFeature(pointFeature, polygonFeature){
+ try{
+  const pt=pointFeature.geometry.coordinates;
+  const geom=polygonFeature.geometry;
+  function inRing(point,ring){
+   let x=point[0],y=point[1],inside=false;
+   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    const intersect=((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi);
+    if(intersect)inside=!inside;
+   }
+   return inside;
+  }
+  function inPolygon(coords){
+   if(!inRing(pt,coords[0]))return false;
+   for(let i=1;i<coords.length;i++)if(inRing(pt,coords[i]))return false;
+   return true;
+  }
+  if(geom.type==='Polygon')return inPolygon(geom.coordinates);
+  if(geom.type==='MultiPolygon')return geom.coordinates.some(inPolygon);
+ }catch(e){}
+ return false;
+}
+function restaurantsForCorr(f){
+ if(!restaurantData)return[];
+ const corr=code(f.properties.CORR_CODE);
+ return restaurantData.features.filter(r=>{
+  const p=r.properties||{};
+  const rc=code(p.PROV_ID)+code(p.DIST_ID)+code(p.CORR_ID);
+  if(rc===corr)return true;
+  return pointInFeature(r,f);
+ });
+}
+function districtRestaurantCount(f){
+ if(!restaurantData)return 0;
+ const p=f.properties,d=code(p.DIST_CODE)||code(p.PROV_ID)+code(p.DIST_ID);
+ return restaurantData.features.filter(r=>code(r.properties.PROV_ID)+code(r.properties.DIST_ID)===d).length;
+}
+function renderRestaurants(features=null){
+ if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
+ if(!restaurantData||!restaurantesVisibles)return;
+ const feats=features||restaurantData.features;
+ restaurantLayer=L.geoJSON({type:'FeatureCollection',features:feats},{
+  pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:4,weight:1,color:'#7c2d12',fillColor:'#f59e0b',fillOpacity:.9}),
+  onEachFeature:(f,l)=>{
+   const p=f.properties||{};
+   l.bindPopup(`<b>🍽️ ${p.NOMBRE_EST||'Establecimiento'}</b><br>${p.DIRECCION||p.CALLE||''}<br><small>${p.CORR_NOMB||''}${p.BARR_NOMB?' · '+p.BARR_NOMB:''}</small>`);
+  }
+ }).addTo(map);
+}
+function marketHtml(f){
+ const p=f.properties;
+ const rs=restaurantsForCorr(f);
+ const area=num(p.AREA);
+ const dens=area&&area>0?rs.length/area:null;
+ const distTotal=districtRestaurantCount(f);
+ const share=distTotal?rs.length/distTotal*100:null;
+ return `<div class="market-card"><b>🍽️ Actividad gastronómica</b>
+ <div class="market-grid">
+  <div class="market-item"><span>Restaurantes</span><strong>${fmtN(rs.length)}</strong></div>
+  <div class="market-item"><span>Rest./km²</span><strong>${dens===null?'—':dens.toLocaleString('es-PA',{maximumFractionDigits:2})}</strong></div>
+  <div class="market-item"><span>% restaurantes distrito</span><strong>${share===null?'—':share.toLocaleString('es-PA',{maximumFractionDigits:2})+'%'}</strong></div>
+  <div class="market-item"><span>Ingreso mediano</span><strong>${fmtMoney(p.ING_MED)}</strong></div>
+ </div>
+ <div style="margin-top:6px;color:#78716c">La presencia de restaurantes se combina con el ingreso del corregimiento como lectura exploratoria de mercado. No representa ventas ni gasto efectivo de los hogares.</div></div>`;
+}
+
+function openChart(){
+ if(!selectedFeature)return;const p=selectedFeature.properties;
+ $('chartTitle').textContent='Indicadores de ingreso';
+ $('chartSub').textContent=(p.CORR_NOMB||'')+' · '+(p.DIST_NOMB||'')+' · '+(p.PROV_NOMB||'');
+ $('modal').classList.add('active');if(chart)chart.destroy();
+ chart=new Chart($('chart'),{type:'bar',data:{labels:['Promedio','Mediana','Mínimo','Máximo'],datasets:[{label:'Balboas (B/.)',data:[num(p.ING_PROM)||0,num(p.ING_MED)||0,num(p.ING_MIN)||0,num(p.ING_MAX)||0]}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},scales:{y:{beginAtZero:true,title:{display:true,text:'Ingreso (B/.)'}}}}});
+}
+function reset(){
+ selectedFeature=null;selectedLayer=null;$('prov').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
+ $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
+ $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants();
+}
+function switchBase(name){Object.values(base).forEach(x=>map.removeLayer(x));base[name].addTo(map);if(layer)layer.bringToFront()}
+
+$('prov').addEventListener('change',loadDistricts);$('dist').addEventListener('change',loadCorrs);$('corr').addEventListener('change',chooseCorr);
+$('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
+$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('active')});
+$('sat').addEventListener('click',()=>switchBase('satellite'));$('street').addEventListener('click',()=>switchBase('street'));
+$('restToggle').addEventListener('click',()=>{
+ restaurantesVisibles=!restaurantesVisibles;
+ $('restToggle').style.background=restaurantesVisibles?'#f59e0b':'#e5e7eb';
+ $('restToggle').style.color=restaurantesVisibles?'white':'#1f2937';
+ if(restaurantesVisibles)renderRestaurants(selectedFeature?restaurantsForCorr(selectedFeature):null);
+ else if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
+});
+
+Promise.all([
+ fetch('ingreso_corr.geojson').then(r=>{if(!r.ok)throw new Error('ingreso_corr.geojson: HTTP '+r.status);return r.json()}),
+ fetch('restaurantes.geojson').then(r=>{if(!r.ok)throw new Error('restaurantes.geojson: HTTP '+r.status);return r.json()})
+])
+.then(([j,rj])=>{
+ data=j; restaurantData=rj;
+ const meds=data.features.map(f=>num(f.properties.ING_MED)).filter(v=>v!==null);
+ minMed=Math.min(...meds);maxMed=Math.max(...meds);
+ populateProvinces();render();renderRestaurants();
+ $('restToggle').style.background='#f59e0b';$('restToggle').style.color='white';
+ $('loading').style.display='none';
+ console.log('Corregimientos:',data.features.length,'Restaurantes:',restaurantData.features.length);
+})
+.catch(err=>{
+ $('loading').innerHTML='<b style="color:#b91c1c">No se pudieron cargar los datos</b><br><br>'+err.message+'<br><small>Verifica que ingreso_corr.geojson, restaurantes.geojson y este HTML estén en el mismo servidor/directorio.</small>';
+ console.error(err);
+});
+</script>
+</body>
+</html>
