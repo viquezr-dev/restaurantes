@@ -46,6 +46,13 @@ canvas{max-height:420px}
 .market-item{background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid #ffedd5}
 .market-item span{display:block;color:#78716c;font-size:8px}.market-item strong{font-size:13px;color:#9a3412}
 @media(max-width:600px){.panel{width:245px;top:6px;right:6px}.cards{grid-template-columns:1fr}.legend{display:none}}
+
+/* Gráficas compactas */
+.modal-card{width:min(560px,92vw)!important;max-height:82vh!important;padding:12px 14px!important}
+.chart-box{height:145px;position:relative;margin:2px 0 8px}
+.chart-box.potential{height:155px}
+.chart-section-title{font-size:10px;font-weight:800;margin:9px 0 2px;color:#334155;text-transform:uppercase;letter-spacing:.25px}
+#chart,#chartRestaurants,#chartPotential{max-height:100%!important}
 </style>
 </head>
 <body>
@@ -84,12 +91,12 @@ canvas{max-height:420px}
 <div class="modal" id="modal">
  <div class="modal-content">
   <div class="modal-head"><div><b id="chartTitle">Estadísticas de ingreso</b><div id="chartSub" style="font-size:10px;color:#64748b"></div></div><button id="close">×</button></div>
-  <div style="font-size:11px;font-weight:700;margin:8px 0 4px">Ingresos del corregimiento</div>
-  <canvas id="chart"></canvas>
-  <div style="font-size:11px;font-weight:700;margin:16px 0 4px">Actividad gastronómica</div>
-  <canvas id="chartRestaurants"></canvas>
-  <div style="font-size:11px;font-weight:700;margin:16px 0 4px">Componentes del potencial de mercado</div>
-  <canvas id="chartPotential"></canvas>
+  <div class="chart-section-title">Ingresos</div>
+  <div class="chart-box"><canvas id="chart"></canvas></div>
+  <div class="chart-section-title">Restaurantes</div>
+  <div class="chart-box"><canvas id="chartRestaurants"></canvas></div>
+  <div class="chart-section-title">Potencial de mercado</div>
+  <div class="chart-box potential"><canvas id="chartPotential"></canvas></div>
  </div>
 </div>
 
@@ -360,13 +367,19 @@ function openChart(){
    labels:['Promedio','Mediana','Mínimo','Máximo'],
    datasets:[{
     label:'Ingreso (B/.)',
-    data:[num(p.ING_PROM)||0,num(p.ING_MED)||0,num(p.ING_MIN)||0,num(p.ING_MAX)||0]
+    data:[num(p.ING_PROM)||0,num(p.ING_MED)||0,num(p.ING_MIN)||0,num(p.ING_MAX)||0],
+    borderRadius:6,
+    borderSkipped:false,
+    maxBarThickness:42
    }]
   },
   options:{
-   responsive:true,
+   responsive:true,maintainAspectRatio:false,
    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},
-   scales:{y:{beginAtZero:true,title:{display:true,text:'Ingreso (B/.)'}}}
+   scales:{
+    x:{grid:{display:false},ticks:{font:{size:9}}},
+    y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8}},title:{display:false}}
+   }
   }
  });
 
@@ -377,16 +390,22 @@ function openChart(){
    labels:['Corregimiento','Resto del distrito'],
    datasets:[{
     label:'Cantidad de restaurantes',
-    data:[rs.length,Math.max(0,distTotal-rs.length)]
+    data:[rs.length,Math.max(0,distTotal-rs.length)],
+    borderRadius:6,
+    borderSkipped:false,
+    maxBarThickness:58
    }]
   },
   options:{
-   responsive:true,
+   responsive:true,maintainAspectRatio:false,
    plugins:{
     legend:{display:false},
     tooltip:{callbacks:{label:c=>new Intl.NumberFormat('es-PA').format(c.raw)+' restaurantes'}}
    },
-   scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'Cantidad de restaurantes'}}}
+   scales:{
+    x:{grid:{display:false},ticks:{font:{size:9}}},
+    y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.18)'},ticks:{precision:0,font:{size:8}},title:{display:false}}
+   }
   }
  });
 
@@ -398,13 +417,19 @@ function openChart(){
    labels:['Capacidad económica','Presencia gastronómica','Densidad gastronómica','Índice total'],
    datasets:[{
     label:'Índice (0-100)',
-    data:[mp.incomeScore,mp.restScore,mp.densityScore,mp.score]
+    data:[mp.incomeScore,mp.restScore,mp.densityScore,mp.score],
+    borderRadius:6,
+    borderSkipped:false,
+    maxBarThickness:42
    }]
   },
   options:{
-   responsive:true,
-   plugins:{legend:{display:false}},
-   scales:{y:{beginAtZero:true,max:100,title:{display:true,text:'Puntuación relativa (0-100)'}}}
+   responsive:true,maintainAspectRatio:false,
+   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}}},
+   scales:{
+    x:{grid:{display:false},ticks:{font:{size:8},maxRotation:0,minRotation:0}},
+    y:{beginAtZero:true,max:100,grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8},stepSize:25},title:{display:false}}
+   }
   }
  });
 }
