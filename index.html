@@ -102,6 +102,32 @@ canvas{max-height:420px}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+
+const barValueLabels={
+ id:'barValueLabels',
+ afterDatasetsDraw(chart,args,opts){
+  const {ctx}=chart;
+  ctx.save();
+  ctx.textAlign='center';
+  ctx.textBaseline='bottom';
+  ctx.font='bold 9px Arial';
+  ctx.fillStyle='#334155';
+  chart.data.datasets.forEach((dataset,di)=>{
+   const meta=chart.getDatasetMeta(di);
+   meta.data.forEach((bar,i)=>{
+    const value=dataset.data[i];
+    if(value===null||value===undefined||!Number.isFinite(Number(value)))return;
+    let label;
+    if(opts&&opts.formatter) label=opts.formatter(Number(value),i);
+    else label=Number(value).toLocaleString('es-PA',{maximumFractionDigits:1});
+    ctx.fillText(label,bar.x,Math.max(bar.y-4,12));
+   });
+  });
+  ctx.restore();
+ }
+};
+Chart.register(barValueLabels);
+
 const map=L.map('map',{center:[8.5,-80],zoom:7});
 const base={
  satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri',maxZoom:19}),
@@ -375,10 +401,10 @@ function openChart(){
   },
   options:{
    responsive:true,maintainAspectRatio:false,
-   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},
+   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}},barValueLabels:{formatter:v=>'B/. '+v.toLocaleString('es-PA',{maximumFractionDigits:0})}},
    scales:{
     x:{grid:{display:false},ticks:{font:{size:9}}},
-    y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8}},title:{display:false}}
+    y:{beginAtZero:true,grace:'12%',grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8}},title:{display:false}}
    }
   }
  });
@@ -400,11 +426,12 @@ function openChart(){
    responsive:true,maintainAspectRatio:false,
    plugins:{
     legend:{display:false},
-    tooltip:{callbacks:{label:c=>new Intl.NumberFormat('es-PA').format(c.raw)+' restaurantes'}}
+    tooltip:{callbacks:{label:c=>new Intl.NumberFormat('es-PA').format(c.raw)+' restaurantes'}},
+    barValueLabels:{formatter:v=>new Intl.NumberFormat('es-PA').format(v)}
    },
    scales:{
     x:{grid:{display:false},ticks:{font:{size:9}}},
-    y:{beginAtZero:true,grid:{color:'rgba(148,163,184,.18)'},ticks:{precision:0,font:{size:8}},title:{display:false}}
+    y:{beginAtZero:true,grace:'15%',grid:{color:'rgba(148,163,184,.18)'},ticks:{precision:0,font:{size:8}},title:{display:false}}
    }
   }
  });
@@ -425,10 +452,10 @@ function openChart(){
   },
   options:{
    responsive:true,maintainAspectRatio:false,
-   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}}},
+   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}},barValueLabels:{formatter:v=>v.toLocaleString('es-PA',{maximumFractionDigits:1})}},
    scales:{
     x:{grid:{display:false},ticks:{font:{size:8},maxRotation:0,minRotation:0}},
-    y:{beginAtZero:true,max:100,grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8},stepSize:25},title:{display:false}}
+    y:{beginAtZero:true,max:110,grid:{color:'rgba(148,163,184,.18)'},ticks:{font:{size:8},callback:v=>v<=100?v:''},title:{display:false}}
    }
   }
  });
