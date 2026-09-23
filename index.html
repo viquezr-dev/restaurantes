@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ingreso por Corregimiento - Panamá</title>
+<title>Análisis del Potencial de Mercado Gastronómico por Corregimiento - Panamá</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
@@ -36,6 +36,11 @@ select{background:#fff}
 canvas{max-height:420px}
 .leaflet-tooltip{font-size:11px}
 .restaurant-icon{background:#fff;border:2px solid #d97706;border-radius:50%;width:12px!important;height:12px!important;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.potential-box{margin-top:8px;padding:10px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc}
+.potential-title{font-size:10px;color:#475569;font-weight:700;text-transform:uppercase}
+.potential-score{font-size:24px;font-weight:800;margin-top:2px}
+.potential-label{font-size:11px;font-weight:700;margin-top:2px}
+.potential-note{font-size:8px;color:#64748b;line-height:1.4;margin-top:5px}
 .market-card{margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px;font-size:9px;line-height:1.55}
 .market-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
 .market-item{background:white;border-radius:6px;padding:6px;text-align:center;border:1px solid #ffedd5}
@@ -48,13 +53,13 @@ canvas{max-height:420px}
 <div class="loading" id="loading">Cargando <b>ingreso_corr.geojson</b> y <b>restaurantes.geojson</b>...</div>
 
 <div class="panel">
- <div class="header"><h3>💰 Ingreso por corregimiento</h3><small>Panamá · análisis de ingresos declarados</small></div>
+ <div class="header"><h3>📊 Potencial de Mercado Gastronómico</h3><small>Panamá · análisis por corregimiento</small></div>
  <label>Provincia</label><select id="prov"><option value="">Todas las provincias</option></select>
  <label>Distrito</label><select id="dist" disabled><option value="">Seleccionar distrito...</option></select>
  <label>Corregimiento</label><select id="corr" disabled><option value="">Seleccionar corregimiento...</option></select>
  <div class="row">
-   <button class="btn-sat" id="sat">🛰️ Satélite</button>
-   <button class="btn-street" id="street">🌍 Callejero</button>
+   <button class="btn-street" id="sat">🛰️ Satélite</button>
+   <button class="btn-sat" id="street">🌍 Callejero</button>
    <button class="btn-street" id="restToggle">🍽️ Restaurantes</button>
  </div>
  <div class="row">
@@ -74,12 +79,17 @@ canvas{max-height:420px}
 <i style="background:#238443"></i> Mayor ingreso<br>
 <span style="color:#64748b">Clasificación relativa según los datos cargados.</span>
 </div>
-<div class="footer">Ingreso declarado por corregimiento · INGR_PER = 0 se considera no declarado</div>
+<div class="footer">Desarrollado por: Raúl Víquez</div>
 
 <div class="modal" id="modal">
  <div class="modal-content">
   <div class="modal-head"><div><b id="chartTitle">Estadísticas de ingreso</b><div id="chartSub" style="font-size:10px;color:#64748b"></div></div><button id="close">×</button></div>
+  <div style="font-size:11px;font-weight:700;margin:8px 0 4px">Ingresos del corregimiento</div>
   <canvas id="chart"></canvas>
+  <div style="font-size:11px;font-weight:700;margin:16px 0 4px">Actividad gastronómica</div>
+  <canvas id="chartRestaurants"></canvas>
+  <div style="font-size:11px;font-weight:700;margin:16px 0 4px">Componentes del potencial de mercado</div>
+  <canvas id="chartPotential"></canvas>
  </div>
 </div>
 
@@ -90,9 +100,9 @@ const base={
  satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri',maxZoom:19}),
  street:L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:19})
 };
-base.satellite.addTo(map);
+base.street.addTo(map);
 
-let data=null, restaurantData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null;
+let data=null, restaurantData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null, chartRestaurants=null, chartPotential=null;
 let restaurantesVisibles=true;
 const $=id=>document.getElementById(id);
 const code=v=>String(v??'').trim();
@@ -153,7 +163,7 @@ function selectFeature(f,l,fromMap=false){
  <div>${p.DIST_NOMB||''} · ${p.PROV_NOMB||''}</div>
  <div>Código: <b>${p.CORR_CODE||''}</b></div>
  <div class="cards">
-  <div class="card"><span>Personas encuestadas</span><strong>${fmtN(p.N_TOTAL)}</strong></div>
+  <div class="card"><span>Habitantes</span><strong>${fmtN(p.N_TOTAL)}</strong></div>
   <div class="card"><span>Ingresos válidos</span><strong>${fmtN(p.N_VALIDOS)}</strong></div>
   <div class="card"><span>No declararon</span><strong>${fmtN(p.N_NO_DECL)}</strong></div>
   <div class="card"><span>Respuesta</span><strong>${fmtPct(p.PCT_RESP)}</strong></div>
@@ -164,7 +174,8 @@ function selectFeature(f,l,fromMap=false){
  </div>
  <div class="quality"><b>Cobertura de respuesta</b>: ${fmtPct(p.PCT_RESP)}
  <div class="bar"><div style="width:${Math.max(0,Math.min(100,num(p.PCT_RESP)||0))}%"></div></div>
- ${fmtN(p.N_VALIDOS)} de ${fmtN(p.N_TOTAL)} personas declararon un ingreso. Los registros con ingreso 0 no se usan en promedio, mediana, mínimo ni máximo.</div>
+ ${fmtN(p.N_VALIDOS)} de ${fmtN(p.N_TOTAL)} habitantes cuentan con ingreso declarado.</div>
+ ${potentialHtml(f)}
  ${marketHtml(f)}`;
  const restCorr=restaurantsForCorr(f);
  renderRestaurants(restCorr);
@@ -176,18 +187,31 @@ function selectFeature(f,l,fromMap=false){
  }
  const b=L.geoJSON(f).getBounds();if(b.isValid())map.fitBounds(b,{padding:[45,45],maxZoom:12});
 }
+
+function restaurantsForProvince(provId){
+ if(!restaurantData)return[];
+ return restaurantData.features.filter(r=>code(r.properties.PROV_ID)===code(provId));
+}
+function restaurantsForDistrict(distCode){
+ if(!restaurantData)return[];
+ const d=code(distCode);
+ return restaurantData.features.filter(r=>(code(r.properties.PROV_ID)+code(r.properties.DIST_ID))===d);
+}
+
 function loadDistricts(){
  const pv=$('prov').value;$('dist').disabled=true;$('corr').disabled=true;
  $('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
- if(!pv){render();return}
+ if(!pv){render();renderRestaurants();return}
  fill($('dist'),unique('DIST_CODE',f=>code(f.properties.PROV_ID)===pv),'DIST_CODE','DIST_NOMB',2);
  render(data.features.filter(f=>code(f.properties.PROV_ID)===pv));
+ renderRestaurants(restaurantsForProvince(pv));
 }
 function loadCorrs(){
  const d=$('dist').value;$('corr').disabled=true;$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
  if(!d){loadDistricts();return}
  fill($('corr'),unique('CORR_CODE',f=>code(f.properties.DIST_CODE)===d),'CORR_CODE','CORR_NOMB',2);
  render(data.features.filter(f=>code(f.properties.DIST_CODE)===d));
+ renderRestaurants(restaurantsForDistrict(d));
 }
 function chooseCorr(){
  const c=$('corr').value;if(!c){loadCorrs();return}
@@ -245,6 +269,64 @@ function renderRestaurants(features=null){
   }
  }).addTo(map);
 }
+
+function minmax(value,min,max){
+ if(value===null||!Number.isFinite(value)||!Number.isFinite(min)||!Number.isFinite(max)||max===min)return 0;
+ return Math.max(0,Math.min(100,100*(value-min)/(max-min)));
+}
+function marketPotential(f){
+ const p=f.properties;
+ const corrRest=restaurantsForCorr(f).length;
+ const med=num(p.ING_MED);
+ const area=num(p.AREA);
+ const density=area&&area>0?corrRest/area:0;
+
+ // Compare each corregimiento primarily with other corregimientos in its district.
+ const d=code(p.DIST_CODE)||code(p.PROV_ID)+code(p.DIST_ID);
+ const peers=data.features.filter(x=>{
+  const xp=x.properties;
+  return (code(xp.DIST_CODE)||code(xp.PROV_ID)+code(xp.DIST_ID))===d;
+ });
+
+ const incomes=peers.map(x=>num(x.properties.ING_MED)).filter(v=>v!==null);
+ const counts=peers.map(x=>restaurantsForCorr(x).length);
+ const densities=peers.map(x=>{
+  const a=num(x.properties.AREA),n=restaurantsForCorr(x).length;
+  return a&&a>0?n/a:0;
+ });
+
+ const incomeScore=incomes.length?minmax(med,Math.min(...incomes),Math.max(...incomes)):0;
+ const restScore=counts.length?minmax(corrRest,Math.min(...counts),Math.max(...counts)):0;
+ const densityScore=densities.length?minmax(density,Math.min(...densities),Math.max(...densities)):0;
+
+ // Exploratory index: purchasing capacity + observed gastronomic activity.
+ // Equal emphasis is intentionally avoided: income is the main socioeconomic component.
+ const score=0.60*incomeScore+0.25*restScore+0.15*densityScore;
+
+ let label='Muy bajo';
+ if(score>=80)label='Muy alto';
+ else if(score>=60)label='Alto';
+ else if(score>=40)label='Medio';
+ else if(score>=20)label='Bajo';
+
+ return {score,incomeScore,restScore,densityScore,label};
+}
+function potentialHtml(f){
+ const m=marketPotential(f);
+ return `<div class="potential-box">
+  <div class="potential-title">Índice exploratorio de potencial gastronómico</div>
+  <div class="potential-score">${m.score.toLocaleString('es-PA',{maximumFractionDigits:1})}<span style="font-size:11px;font-weight:600"> / 100</span></div>
+  <div class="potential-label">${m.label}</div>
+  <div class="market-grid">
+   <div class="market-item"><span>Capacidad económica</span><strong>${m.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+   <div class="market-item"><span>Presencia gastronómica</span><strong>${m.restScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+   <div class="market-item"><span>Densidad gastronómica</span><strong>${m.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+   <div class="market-item"><span>Referencia</span><strong style="font-size:10px">${f.properties.DIST_NOMB||'Distrito'}</strong></div>
+  </div>
+  <div class="potential-note">Índice exploratorio relativo al distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². Sirve para comparación territorial; no representa ventas ni gasto efectivo.</div>
+ </div>`;
+}
+
 function marketHtml(f){
  const p=f.properties;
  const rs=restaurantsForCorr(f);
@@ -263,18 +345,82 @@ function marketHtml(f){
 }
 
 function openChart(){
- if(!selectedFeature)return;const p=selectedFeature.properties;
- $('chartTitle').textContent='Indicadores de ingreso';
+ if(!selectedFeature)return;
+ const p=selectedFeature.properties;
+ const rs=restaurantsForCorr(selectedFeature);
+ const distTotal=districtRestaurantCount(selectedFeature);
+ $('chartTitle').textContent='Potencial de mercado gastronómico';
  $('chartSub').textContent=(p.CORR_NOMB||'')+' · '+(p.DIST_NOMB||'')+' · '+(p.PROV_NOMB||'');
- $('modal').classList.add('active');if(chart)chart.destroy();
- chart=new Chart($('chart'),{type:'bar',data:{labels:['Promedio','Mediana','Mínimo','Máximo'],datasets:[{label:'Balboas (B/.)',data:[num(p.ING_PROM)||0,num(p.ING_MED)||0,num(p.ING_MIN)||0,num(p.ING_MAX)||0]}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},scales:{y:{beginAtZero:true,title:{display:true,text:'Ingreso (B/.)'}}}}});
+ $('modal').classList.add('active');
+
+ if(chart)chart.destroy();
+ chart=new Chart($('chart'),{
+  type:'bar',
+  data:{
+   labels:['Promedio','Mediana','Mínimo','Máximo'],
+   datasets:[{
+    label:'Ingreso (B/.)',
+    data:[num(p.ING_PROM)||0,num(p.ING_MED)||0,num(p.ING_MIN)||0,num(p.ING_MAX)||0]
+   }]
+  },
+  options:{
+   responsive:true,
+   plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},
+   scales:{y:{beginAtZero:true,title:{display:true,text:'Ingreso (B/.)'}}}
+  }
+ });
+
+ if(chartRestaurants)chartRestaurants.destroy();
+ chartRestaurants=new Chart($('chartRestaurants'),{
+  type:'bar',
+  data:{
+   labels:['Corregimiento','Resto del distrito'],
+   datasets:[{
+    label:'Cantidad de restaurantes',
+    data:[rs.length,Math.max(0,distTotal-rs.length)]
+   }]
+  },
+  options:{
+   responsive:true,
+   plugins:{
+    legend:{display:false},
+    tooltip:{callbacks:{label:c=>new Intl.NumberFormat('es-PA').format(c.raw)+' restaurantes'}}
+   },
+   scales:{y:{beginAtZero:true,ticks:{precision:0},title:{display:true,text:'Cantidad de restaurantes'}}}
+  }
+ });
+
+ const mp=marketPotential(selectedFeature);
+ if(chartPotential)chartPotential.destroy();
+ chartPotential=new Chart($('chartPotential'),{
+  type:'bar',
+  data:{
+   labels:['Capacidad económica','Presencia gastronómica','Densidad gastronómica','Índice total'],
+   datasets:[{
+    label:'Índice (0-100)',
+    data:[mp.incomeScore,mp.restScore,mp.densityScore,mp.score]
+   }]
+  },
+  options:{
+   responsive:true,
+   plugins:{legend:{display:false}},
+   scales:{y:{beginAtZero:true,max:100,title:{display:true,text:'Puntuación relativa (0-100)'}}}
+  }
+ });
 }
 function reset(){
  selectedFeature=null;selectedLayer=null;$('prov').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants();
 }
-function switchBase(name){Object.values(base).forEach(x=>map.removeLayer(x));base[name].addTo(map);if(layer)layer.bringToFront()}
+function switchBase(name){
+ Object.values(base).forEach(x=>map.removeLayer(x));
+ base[name].addTo(map);
+ $('sat').className=name==='satellite'?'btn-sat':'btn-street';
+ $('street').className=name==='street'?'btn-sat':'btn-street';
+ if(layer)layer.bringToFront();
+ if(restaurantLayer)restaurantLayer.bringToFront();
+}
 
 $('prov').addEventListener('change',loadDistricts);$('dist').addEventListener('change',loadCorrs);$('corr').addEventListener('change',chooseCorr);
 $('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
