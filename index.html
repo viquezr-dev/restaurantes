@@ -53,24 +53,29 @@ canvas{max-height:420px}
 .chart-box.potential{height:155px}
 .chart-section-title{font-size:10px;font-weight:800;margin:9px 0 2px;color:#334155;text-transform:uppercase;letter-spacing:.25px}
 #chart,#chartRestaurants,#chartPotential{max-height:100%!important}
-</style>
+#restaurantSearchBox{position:absolute;top:12px;left:55px;z-index:1200;width:min(390px,calc(100vw - 80px));background:rgba(255,255,255,.97);border:1px solid #cbd5e1;border-radius:10px;padding:8px 9px;box-shadow:0 3px 14px rgba(15,23,42,.18);box-sizing:border-box}
+.restaurant-search-title{font-size:10px;font-weight:800;color:#334155;margin:0 0 5px 1px}
+.restaurant-search-row{display:flex;align-items:stretch;gap:6px;width:100%}
+#restaurantSearch{display:block;flex:1 1 auto;min-width:0;width:100%;height:34px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:7px;padding:0 10px;font-size:11px;background:#fff;color:#0f172a;outline:none}
+#restaurantSearch:focus{border-color:#64748b;box-shadow:0 0 0 2px rgba(100,116,139,.12)}
+#restaurantClear{flex:0 0 34px;width:34px;height:34px;border:0;border-radius:7px;cursor:pointer;background:#e2e8f0;color:#334155;font-weight:700}
+#restaurantResults{display:none;max-height:190px;overflow:auto;margin-top:5px;border:1px solid #e2e8f0;border-radius:7px;background:white}
+@media(max-width:600px){#restaurantSearchBox{top:8px;left:48px;width:calc(100vw - 60px);padding:7px}#restaurantSearch{font-size:16px}}</style>
 </head>
 <body>
-<div id="map"></div>
+<div id="map"></div><div id="restaurantSearchBox">
+ <div class="restaurant-search-title">🔎 Buscar restaurante</div>
+ <div class="restaurant-search-row">
+  <input id="restaurantSearch" type="search" placeholder="Escriba el nombre del restaurante..." autocomplete="off">
+  <button id="restaurantClear" type="button" title="Limpiar búsqueda">✕</button>
+ </div>
+ <div id="restaurantResults"></div>
+</div>
 <div class="loading" id="loading">Cargando <b>ingreso_corr.geojson</b> y <b>restaurantes.geojson</b>...</div>
 
 <div class="panel">
  <div class="header"><h3>📊 Potencial de Mercado Gastronómico</h3><small>Panamá · análisis por corregimiento</small></div>
-<div style="padding:8px 10px 3px">
- <label for="restaurantSearch" style="font-size:9px;font-weight:700;color:#475569">Buscar restaurante</label>
- <div style="display:flex;gap:5px;margin-top:3px">
-  <input id="restaurantSearch" type="search" placeholder="Nombre del restaurante..." autocomplete="off"
-   style="min-width:0;flex:1;border:1px solid #cbd5e1;border-radius:7px;padding:7px 8px;font-size:10px;outline:none">
-  <button id="restaurantClear" type="button" title="Limpiar búsqueda"
-   style="border:0;border-radius:7px;padding:0 9px;cursor:pointer;background:#e2e8f0;color:#334155">✕</button>
- </div>
- <div id="restaurantResults" style="display:none;max-height:145px;overflow:auto;margin-top:4px;border:1px solid #e2e8f0;border-radius:7px;background:white"></div>
-</div>
+
  <label>Provincia</label><select id="prov"><option value="">Todas las provincias</option></select>
  <label>Distrito</label><select id="dist" disabled><option value="">Seleccionar distrito...</option></select>
  <label>Corregimiento</label><select id="corr" disabled><option value="">Seleccionar corregimiento...</option></select>
