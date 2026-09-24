@@ -357,7 +357,7 @@ function potentialHtml(f){
   <div class="potential-label">${m.label}</div>
   <div class="market-grid">
    <div class="market-item"><span>Capacidad económica</span><strong>${m.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
-   <div class="market-item"><span>Presencia gastronómica</span><strong>${m.restScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+   <div class="market-item"><span>Cantidad relativa de restaurantes</span><strong>${m.restScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
    <div class="market-item"><span>Densidad gastronómica</span><strong>${m.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
    <div class="market-item"><span>Referencia</span><strong style="font-size:10px">${f.properties.DIST_NOMB||'Distrito'}</strong></div>
   </div>
@@ -446,7 +446,7 @@ function openChart(){
  chartPotential=new Chart($('chartPotential'),{
   type:'bar',
   data:{
-   labels:['Capacidad económica','Presencia gastronómica','Densidad gastronómica','Índice total'],
+   labels:['Capacidad económica','Cantidad relativa de restaurantes','Densidad gastronómica','Índice total'],
    datasets:[{
     label:'Índice (0-100)',
     data:[mp.incomeScore,mp.restScore,mp.densityScore,mp.score],
