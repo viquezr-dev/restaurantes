@@ -340,7 +340,7 @@ function restaurantAreaPopup(r){
 
  const p=f.properties||{};
  const rs=restaurantsForCorr(f);
- const area=num(p.AREA_KM2);
+ const area=num(p.AREA);
  const dens=area&&area>0?rs.length/area:null;
  const distTotal=districtRestaurantCount(f);
  const share=distTotal?rs.length/distTotal*100:null;
@@ -405,7 +405,7 @@ function marketPotential(f){
  const p=f.properties;
  const corrRest=restaurantsForCorr(f).length;
  const med=num(p.ING_MED);
- const area=num(p.AREA_KM2);
+ const area=num(p.AREA);
  const density=area&&area>0?corrRest/area:0;
 
  // Compare each corregimiento primarily with other corregimientos in its district.
@@ -418,7 +418,7 @@ function marketPotential(f){
  const incomes=peers.map(x=>num(x.properties.ING_MED)).filter(v=>v!==null);
  const counts=peers.map(x=>restaurantsForCorr(x).length);
  const densities=peers.map(x=>{
-  const a=num(x.properties.AREA_KM2),n=restaurantsForCorr(x).length;
+  const a=num(x.properties.AREA),n=restaurantsForCorr(x).length;
   return a&&a>0?n/a:0;
  });
 
@@ -457,7 +457,7 @@ function potentialHtml(f){
 function marketHtml(f){
  const p=f.properties;
  const rs=restaurantsForCorr(f);
- const area=num(p.AREA_KM2);
+ const area=num(p.AREA);
  const dens=area&&area>0?rs.length/area:null;
  const distTotal=districtRestaurantCount(f);
  const share=distTotal?rs.length/distTotal*100:null;
