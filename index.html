@@ -135,7 +135,7 @@ const base={
 };
 base.street.addTo(map);
 
-let data=null, restaurantData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null, chartRestaurants=null, chartPotential=null;
+let data=null, allData=null, restaurantData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null, chartRestaurants=null, chartPotential=null;
 let restaurantesVisibles=true;
 const $=id=>document.getElementById(id);
 const code=v=>String(v??'').trim();
@@ -221,14 +221,20 @@ function selectFeature(f,l,fromMap=false){
  const b=L.geoJSON(f).getBounds();if(b.isValid())map.fitBounds(b,{padding:[45,45],maxZoom:12});
 }
 
+function restaurantsForPolygons(polygons){
+ if(!restaurantData||!polygons||!polygons.length)return[];
+ return restaurantData.features.filter(r=>polygons.some(f=>pointInFeature(r,f)));
+}
 function restaurantsForProvince(provId){
- if(!restaurantData)return[];
- return restaurantData.features.filter(r=>code(r.properties.PROV_ID)===code(provId));
+ if(!data)return[];
+ const polygons=data.features.filter(f=>code(f.properties.PROV_ID)===code(provId));
+ return restaurantsForPolygons(polygons);
 }
 function restaurantsForDistrict(distCode){
- if(!restaurantData)return[];
+ if(!data)return[];
  const d=code(distCode);
- return restaurantData.features.filter(r=>(code(r.properties.PROV_ID)+code(r.properties.DIST_ID))===d);
+ const polygons=data.features.filter(f=>code(f.properties.DIST_CODE)===d);
+ return restaurantsForPolygons(polygons);
 }
 
 function loadDistricts(){
@@ -277,18 +283,17 @@ function pointInFeature(pointFeature, polygonFeature){
 }
 function restaurantsForCorr(f){
  if(!restaurantData)return[];
- const corr=code(f.properties.CORR_CODE);
- return restaurantData.features.filter(r=>{
-  const p=r.properties||{};
-  const rc=code(p.PROV_ID)+code(p.DIST_ID)+code(p.CORR_ID);
-  if(rc===corr)return true;
-  return pointInFeature(r,f);
- });
+ return restaurantData.features.filter(r=>pointInFeature(r,f));
 }
 function districtRestaurantCount(f){
- if(!restaurantData)return 0;
+ if(!data)return 0;
  const p=f.properties,d=code(p.DIST_CODE)||code(p.PROV_ID)+code(p.DIST_ID);
- return restaurantData.features.filter(r=>code(r.properties.PROV_ID)+code(r.properties.DIST_ID)===d).length;
+ return data.features
+  .filter(x=>{
+   const xp=x.properties;
+   return (code(xp.DIST_CODE)||code(xp.PROV_ID)+code(xp.DIST_ID))===d;
+  })
+  .reduce((sum,x)=>sum+restaurantsForCorr(x).length,0);
 }
 function renderRestaurants(features=null){
  if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
@@ -463,7 +468,7 @@ function openChart(){
 function reset(){
  selectedFeature=null;selectedLayer=null;$('prov').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
- $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants();
+ $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants(restaurantsForPolygons(data.features));
 }
 function switchBase(name){
  Object.values(base).forEach(x=>map.removeLayer(x));
@@ -482,7 +487,7 @@ $('restToggle').addEventListener('click',()=>{
  restaurantesVisibles=!restaurantesVisibles;
  $('restToggle').style.background=restaurantesVisibles?'#f59e0b':'#e5e7eb';
  $('restToggle').style.color=restaurantesVisibles?'white':'#1f2937';
- if(restaurantesVisibles)renderRestaurants(selectedFeature?restaurantsForCorr(selectedFeature):null);
+ if(restaurantesVisibles)renderRestaurants(selectedFeature?restaurantsForCorr(selectedFeature):restaurantsForPolygons(data.features));
  else if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
 });
 
@@ -491,13 +496,34 @@ Promise.all([
  fetch('restaurantes.geojson').then(r=>{if(!r.ok)throw new Error('restaurantes.geojson: HTTP '+r.status);return r.json()})
 ])
 .then(([j,rj])=>{
- data=j; restaurantData=rj;
+ allData=j; restaurantData=rj;
+
+ // Filtro espacial dinámico:
+ // solo quedan visibles/seleccionables los corregimientos que contienen
+ // al menos un punto de restaurantes.geojson.
+ const activeFeatures=allData.features.filter(f=>restaurantsForCorr(f).length>0);
+ data={type:'FeatureCollection',features:activeFeatures};
+
+ // Solo se dibujan puntos que realmente caen dentro de algún corregimiento activo.
+ const restaurantesDentro=restaurantsForPolygons(activeFeatures);
+
  const meds=data.features.map(f=>num(f.properties.ING_MED)).filter(v=>v!==null);
- minMed=Math.min(...meds);maxMed=Math.max(...meds);
- populateProvinces();render();renderRestaurants();
+ minMed=meds.length?Math.min(...meds):0;
+ maxMed=meds.length?Math.max(...meds):1;
+
+ populateProvinces();
+ render();
+ renderRestaurants(restaurantesDentro);
+
  $('restToggle').style.background='#f59e0b';$('restToggle').style.color='white';
  $('loading').style.display='none';
- console.log('Corregimientos:',data.features.length,'Restaurantes:',restaurantData.features.length);
+
+ console.log(
+  'Corregimientos totales:',allData.features.length,
+  'Corregimientos con restaurantes:',data.features.length,
+  'Restaurantes totales:',restaurantData.features.length,
+  'Restaurantes dentro de corregimientos:',restaurantesDentro.length
+ );
 })
 .catch(err=>{
  $('loading').innerHTML='<b style="color:#b91c1c">No se pudieron cargar los datos</b><br><br>'+err.message+'<br><small>Verifica que ingreso_corr.geojson, restaurantes.geojson y este HTML estén en el mismo servidor/directorio.</small>';
