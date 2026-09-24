@@ -60,7 +60,23 @@ canvas{max-height:420px}
 #restaurantSearch:focus{border-color:#64748b;box-shadow:0 0 0 2px rgba(100,116,139,.12)}
 #restaurantClear{flex:0 0 34px;width:34px;height:34px;border:0;border-radius:7px;cursor:pointer;background:#e2e8f0;color:#334155;font-weight:700}
 #restaurantResults{display:none;max-height:190px;overflow:auto;margin-top:5px;border:1px solid #e2e8f0;border-radius:7px;background:white}
-@media(max-width:600px){#restaurantSearchBox{top:8px;left:48px;width:calc(100vw - 60px);padding:7px}#restaurantSearch{font-size:16px}}.potential-help-overlay{display:none;position:absolute;inset:0;z-index:3000;background:rgba(15,23,42,.38);align-items:center;justify-content:center;padding:15px;box-sizing:border-box}.potential-help-overlay.show{display:flex}.potential-help-card{width:min(520px,calc(100% - 20px));max-height:calc(100% - 30px);overflow:auto;background:#fff;border-radius:13px;box-shadow:0 12px 35px rgba(15,23,42,.3);color:#0f172a}.potential-help-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 10px;border-bottom:1px solid #e2e8f0}.potential-help-title{font-size:15px;font-weight:800}.potential-help-sub{font-size:10px;color:#64748b;margin-top:2px}.potential-help-close{border:0;background:#e2e8f0;color:#334155;border-radius:7px;width:30px;height:30px;cursor:pointer;font-weight:700}.potential-help-body{padding:13px 16px 16px}.potential-help-item{padding:10px 0}.potential-help-item+.potential-help-item{border-top:1px solid #e2e8f0}.potential-help-name{font-size:12px;font-weight:800;margin-bottom:5px}.potential-help-item p{font-size:10.5px;line-height:1.5;color:#475569;margin:4px 0}</style>
+@media(max-width:600px){#restaurantSearchBox{top:8px;left:48px;width:calc(100vw - 60px);padding:7px}#restaurantSearch{font-size:16px}}.potential-help-overlay{display:none;position:absolute;inset:0;z-index:3000;background:rgba(15,23,42,.38);align-items:center;justify-content:center;padding:15px;box-sizing:border-box}.potential-help-overlay.show{display:flex}.potential-help-card{width:min(520px,calc(100% - 20px));max-height:calc(100% - 30px);overflow:auto;background:#fff;border-radius:13px;box-shadow:0 12px 35px rgba(15,23,42,.3);color:#0f172a}.potential-help-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 16px 10px;border-bottom:1px solid #e2e8f0}.potential-help-title{font-size:15px;font-weight:800}.potential-help-sub{font-size:10px;color:#64748b;margin-top:2px}.potential-help-close{border:0;background:#e2e8f0;color:#334155;border-radius:7px;width:30px;height:30px;cursor:pointer;font-weight:700}.potential-help-body{padding:13px 16px 16px}.potential-help-item{padding:10px 0}.potential-help-item+.potential-help-item{border-top:1px solid #e2e8f0}.potential-help-name{font-size:12px;font-weight:800;margin-bottom:5px}.potential-help-item p{font-size:10.5px;line-height:1.5;color:#475569;margin:4px 0}
+.rest-popup{font-family:Arial,sans-serif;color:#0f172a;min-width:310px}
+.rest-popup-name{font-size:14px;font-weight:800;padding-right:15px}
+.rest-popup-muted{font-size:10px;color:#64748b;margin-top:2px}
+.rest-popup-area{font-size:10px;font-weight:700;color:#334155;margin-top:5px;padding-bottom:7px;border-bottom:1px solid #e2e8f0}
+.rest-popup-section{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.35px;color:#475569;margin:9px 0 5px}
+.rest-popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.rest-popup-grid>div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:5px 6px;min-width:0}
+.rest-popup-grid span{display:block;font-size:8.5px;color:#64748b;line-height:1.15}
+.rest-popup-grid b{display:block;font-size:10.5px;color:#0f172a;margin-top:2px;overflow-wrap:anywhere}
+.rest-popup-score{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f1f5f9;border-radius:7px;padding:6px 8px;margin-bottom:5px}
+.rest-popup-score b{font-size:16px}.rest-popup-score span{font-size:10px;font-weight:800;color:#475569}
+.rest-popup-note{font-size:10px;color:#64748b;margin-top:8px}
+.leaflet-popup-content{margin:11px 13px}
+@media(max-width:600px){.rest-popup{min-width:250px}.rest-popup-grid{grid-template-columns:1fr 1fr}}
+
+</style>
 </head>
 <body>
 <div id="map"></div><div id="potentialHelpModal" class="potential-help-overlay" aria-hidden="true"><div class="potential-help-card"><div class="potential-help-head"><div><div class="potential-help-title">¿Qué significan los indicadores?</div><div class="potential-help-sub">Guía rápida para interpretar el análisis</div></div><button id="closePotentialHelp" type="button" class="potential-help-close">✕</button></div><div class="potential-help-body"><div class="potential-help-item"><div class="potential-help-name">🍽️ Cantidad relativa de restaurantes</div><p>Compara la cantidad de restaurantes del corregimiento con los demás corregimientos del mismo distrito. Se expresa en una escala de 0 a 100: un valor más alto indica una mayor cantidad relativa de restaurantes dentro de ese distrito.</p></div><div class="potential-help-item"><div class="potential-help-name">📈 Índice exploratorio de potencial gastronómico</div><p>Es un indicador comparativo que combina tres componentes: <b>60% capacidad económica</b> (ingreso mediano), <b>25% cantidad relativa de restaurantes</b> y <b>15% densidad gastronómica</b> (restaurantes por km²).</p><p>El resultado se expresa de 0 a 100 y sirve para comparar territorialmente los corregimientos del mismo distrito. <b>No representa ventas, ganancias ni gasto efectivo en restaurantes.</b></p></div></div></div></div><div id="restaurantSearchBox">
@@ -311,6 +327,61 @@ function districtRestaurantCount(f){
   })
   .reduce((sum,x)=>sum+restaurantsForCorr(x).length,0);
 }
+
+function restaurantAreaPopup(r){
+ const rp=r.properties||{};
+ const f=spatialCorrForRestaurant(r);
+ const nombre=rp.NOMBRE_EST||'Establecimiento';
+ if(!f){
+  return `<div class="rest-popup"><div class="rest-popup-name">🍽️ ${nombre}</div>
+   <div class="rest-popup-muted">${rp.DIRECCION||rp.CALLE||''}</div>
+   <div class="rest-popup-note">No fue posible asociar espacialmente este punto con un corregimiento activo.</div></div>`;
+ }
+
+ const p=f.properties||{};
+ const rs=restaurantsForCorr(f);
+ const area=num(p.AREA_KM2);
+ const dens=area&&area>0?rs.length/area:null;
+ const distTotal=districtRestaurantCount(f);
+ const share=distTotal?rs.length/distTotal*100:null;
+ const m=marketPotential(f);
+
+ return `<div class="rest-popup">
+  <div class="rest-popup-name">🍽️ ${nombre}</div>
+  <div class="rest-popup-muted">${rp.DIRECCION||rp.CALLE||''}</div>
+  <div class="rest-popup-area">${p.CORR_NOMB||''} · ${p.DIST_NOMB||''} · ${p.PROV_NOMB||''}</div>
+
+  <div class="rest-popup-section">Datos del área</div>
+  <div class="rest-popup-grid">
+   <div><span>Habitantes</span><b>${fmtN(p.N_TOTAL)}</b></div>
+   <div><span>Ingresos válidos</span><b>${fmtN(p.N_VALIDOS)}</b></div>
+   <div><span>No declararon</span><b>${fmtN(p.N_NO_DECL)}</b></div>
+   <div><span>Respuesta</span><b>${fmtPct(p.PCT_RESP)}</b></div>
+   <div><span>Ingreso promedio</span><b>${fmtMoney(p.ING_PROM)}</b></div>
+   <div><span>Ingreso mediano</span><b>${fmtMoney(p.ING_MED)}</b></div>
+   <div><span>Ingreso mínimo</span><b>${fmtMoney(p.ING_MIN)}</b></div>
+   <div><span>Ingreso máximo</span><b>${fmtMoney(p.ING_MAX)}</b></div>
+  </div>
+
+  <div class="rest-popup-section">Actividad gastronómica</div>
+  <div class="rest-popup-grid">
+   <div><span>Restaurantes</span><b>${fmtN(rs.length)}</b></div>
+   <div><span>Rest./km²</span><b>${dens===null?'—':dens.toLocaleString('es-PA',{maximumFractionDigits:2})}</b></div>
+   <div><span>% restaurantes distrito</span><b>${share===null?'—':share.toLocaleString('es-PA',{maximumFractionDigits:2})+'%'}</b></div>
+   <div><span>Área</span><b>${area===null?'—':area.toLocaleString('es-PA',{maximumFractionDigits:2})+' km²'}</b></div>
+  </div>
+
+  <div class="rest-popup-section">Potencial gastronómico</div>
+  <div class="rest-popup-score"><b>${m.score.toLocaleString('es-PA',{maximumFractionDigits:1})} / 100</b><span>${m.label}</span></div>
+  <div class="rest-popup-grid">
+   <div><span>Capacidad económica</span><b>${m.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Cantidad relativa restaurantes</span><b>${m.restScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Densidad gastronómica</span><b>${m.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Referencia</span><b>${p.DIST_NOMB||'Distrito'}</b></div>
+  </div>
+ </div>`;
+}
+
 function renderRestaurants(features=null){
  if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
  if(!restaurantData||!restaurantesVisibles)return;
@@ -321,7 +392,7 @@ function renderRestaurants(features=null){
    const p=f.properties||{};
    const nombre=p.NOMBRE_EST||'Establecimiento';
    l.bindTooltip(nombre,{direction:'top',offset:[0,-5],opacity:.95,sticky:true});
-   l.bindPopup(`<b>🍽️ ${nombre}</b><br>${p.DIRECCION||p.CALLE||''}<br><small>${p.CORR_NOMB||''}${p.BARR_NOMB?' · '+p.BARR_NOMB:''}</small>`);
+   l.bindPopup(()=>restaurantAreaPopup(f),{maxWidth:430,minWidth:340});
   }
  }).addTo(map);
 }
