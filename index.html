@@ -370,6 +370,48 @@ function restaurantEnvironment(r){
  return {n500,n1000,nearest};
 }
 
+
+function restaurantLocalPotential(pob){
+ const p=pob.properties||{};
+ const rs=restaurantsForPoblado(pob);
+ const med=num(p.ING_MED);
+ const area=num(p.AREA);
+ const density=area&&area>0?rs.length/area:0;
+
+ // Reference group: other lugares poblados in the same district.
+ const distCode=code(p.DIST_CODE)||code(p.PROV_ID)+code(p.DIST_ID);
+ const peers=(pobladoData?.features||[]).filter(x=>{
+  const xp=x.properties||{};
+  const xd=code(xp.DIST_CODE)||code(xp.PROV_ID)+code(xp.DIST_ID);
+  return xd===distCode;
+ });
+
+ const incomes=peers.map(x=>num(x.properties.ING_MED)).filter(v=>v!==null);
+ const counts=peers.map(x=>restaurantsForPoblado(x).length);
+ const densities=peers.map(x=>{
+  const a=num(x.properties.AREA);
+  const n=restaurantsForPoblado(x).length;
+  return a&&a>0?n/a:0;
+ });
+
+ const incomeScore=incomes.length&&med!==null
+  ?minmax(med,Math.min(...incomes),Math.max(...incomes)):0;
+ const restScore=counts.length
+  ?minmax(rs.length,Math.min(...counts),Math.max(...counts)):0;
+ const densityScore=densities.length
+  ?minmax(density,Math.min(...densities),Math.max(...densities)):0;
+
+ const score=0.60*incomeScore+0.25*restScore+0.15*densityScore;
+
+ let label='Muy bajo';
+ if(score>=80)label='Muy alto';
+ else if(score>=60)label='Alto';
+ else if(score>=40)label='Medio';
+ else if(score>=20)label='Bajo';
+
+ return {score,incomeScore,restScore,densityScore,label};
+}
+
 function restaurantAreaPopup(r){
  const rp=r.properties||{};
  const corr=spatialCorrForRestaurant(r);
@@ -404,6 +446,7 @@ function restaurantAreaPopup(r){
  const rsPob=restaurantsForPoblado(pob);
  const area=num(p.AREA);
  const dens=area&&area>0?rsPob.length/area:null;
+ const pot=restaurantLocalPotential(pob);
 
  return `<div class="rest-popup">
   <div class="rest-popup-name">🍽️ ${nombre}</div>
@@ -435,6 +478,19 @@ function restaurantAreaPopup(r){
    <div><span>Área</span><b>${area===null?'—':area.toLocaleString('es-PA',{maximumFractionDigits:2})+' km²'}</b></div>
    <div><span>Rest./km²</span><b>${dens===null?'—':dens.toLocaleString('es-PA',{maximumFractionDigits:2})}</b></div>
    <div><span>LUPO_CODE</span><b>${p.LUPO_CODE||'—'}</b></div>
+  </div>
+
+  <div class="rest-popup-section">Índice exploratorio de potencial gastronómico</div>
+  <div class="potential-box" style="margin-top:6px">
+   <div class="potential-score">${pot.score.toLocaleString('es-PA',{maximumFractionDigits:1})}<span style="font-size:11px;font-weight:600"> / 100</span></div>
+   <div class="potential-label">${pot.label}</div>
+   <div class="market-grid">
+    <div class="market-item"><span>Capacidad económica</span><strong>${pot.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+    <div class="market-item"><span>Cantidad relativa de restaurantes</span><strong>${pot.restScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+    <div class="market-item"><span>Densidad gastronómica</span><strong>${pot.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
+    <div class="market-item"><span>Referencia</span><strong style="font-size:10px">${p.DIST_NOMB||'Distrito'}</strong></div>
+   </div>
+   <div class="potential-note">Índice exploratorio del lugar poblado, relativo a los demás lugares poblados del distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². No representa ventas ni gasto efectivo.</div>
   </div>
 
   <div class="rest-popup-section">Entorno del restaurante</div>
