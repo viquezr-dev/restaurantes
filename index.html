@@ -96,6 +96,7 @@ style="position:absolute;top:8px;right:8px;z-index:20;width:32px;height:32px;bor
  <label>Provincia</label><select id="prov"><option value="">Todas las provincias</option></select>
  <label>Distrito</label><select id="dist" disabled><option value="">Seleccionar distrito...</option></select>
  <label>Corregimiento</label><select id="corr" disabled><option value="">Seleccionar corregimiento...</option></select>
+ <label>Categoría</label><select id="categoria"><option value="">Todas las categorías</option></select>
  <div class="row">
    <button class="btn-street" id="sat">🛰️ Satélite</button>
    <button class="btn-sat" id="street">🌍 Callejero</button>
@@ -253,9 +254,35 @@ function selectFeature(f,l,fromMap=false){
  const b=L.geoJSON(f).getBounds();if(b.isValid())map.fitBounds(b,{padding:[45,45],maxZoom:12});
 }
 
+function selectedCategory(){
+ return $('categoria')?String($('categoria').value||'').trim():'';
+}
+function matchesCategory(r){
+ const sel=selectedCategory();
+ if(!sel)return true;
+ return String(r?.properties?.CATEGORIA??'').trim()===sel;
+}
+function filterByCategory(rests){
+ return (rests||[]).filter(matchesCategory);
+}
+function populateCategories(){
+ const sel=$('categoria');
+ if(!sel||!restaurantData)return;
+ const cats=[...new Set(
+  restaurantData.features
+   .map(r=>String(r.properties?.CATEGORIA??'').trim())
+   .filter(Boolean)
+ )].sort((a,b)=>a.localeCompare(b,'es'));
+ sel.innerHTML='<option value="">Todas las categorías</option>';
+ cats.forEach(c=>{
+  const o=document.createElement('option');
+  o.value=c;o.textContent=c;sel.appendChild(o);
+ });
+}
+
 function restaurantsForPolygons(polygons){
  if(!restaurantData||!polygons||!polygons.length)return[];
- return restaurantData.features.filter(r=>polygons.some(f=>pointInFeature(r,f)));
+ return restaurantData.features.filter(r=>matchesCategory(r)&&polygons.some(f=>pointInFeature(r,f)));
 }
 function restaurantsForProvince(provId){
  if(!data)return[];
@@ -315,7 +342,7 @@ function pointInFeature(pointFeature, polygonFeature){
 }
 function restaurantsForCorr(f){
  if(!restaurantData)return[];
- return restaurantData.features.filter(r=>pointInFeature(r,f));
+ return restaurantData.features.filter(r=>pointInFeature(r,f)&&matchesCategory(r));
 }
 function districtRestaurantCount(f){
  if(!data)return 0;
@@ -335,7 +362,7 @@ function spatialPobladoForRestaurant(r){
 }
 function restaurantsForPoblado(f){
  if(!restaurantData||!f)return[];
- return restaurantData.features.filter(r=>pointInFeature(r,f));
+ return restaurantData.features.filter(r=>pointInFeature(r,f)&&matchesCategory(r));
 }
 function restaurantCoords(r){
  try{
@@ -360,7 +387,7 @@ function restaurantEnvironment(r){
  if(!restaurantData)return {n500:0,n1000:0,nearest:null};
  let n500=0,n1000=0,nearest=null;
  restaurantData.features.forEach(o=>{
-  if(o===r)return;
+  if(o===r||!matchesCategory(o))return;
   const d=haversineMeters(r,o);
   if(d===null)return;
   if(d<=500)n500++;
@@ -420,7 +447,7 @@ function restaurantAreaPopup(r){
 
  if(!corr){
   return `<div class="rest-popup"><div class="rest-popup-name">🍽️ ${nombre}</div>
-   <div class="rest-popup-muted">${rp.DIRECCION||rp.CALLE||''}</div>
+   <div class="rest-popup-muted"><b>Categoría:</b> ${rp.CATEGORIA||'Sin categoría'}${rp.CALLE?'<br><b>Calle / referencia:</b> '+rp.CALLE:''}</div>
    <div class="rest-popup-note">No fue posible asociar espacialmente este punto con un corregimiento activo.</div></div>`;
  }
 
@@ -430,7 +457,7 @@ function restaurantAreaPopup(r){
  if(!pob){
   return `<div class="rest-popup">
    <div class="rest-popup-name">🍽️ ${nombre}</div>
-   <div class="rest-popup-muted">${rp.DIRECCION||rp.CALLE||''}</div>
+   <div class="rest-popup-muted"><b>Categoría:</b> ${rp.CATEGORIA||'Sin categoría'}${rp.CALLE?'<br><b>Calle / referencia:</b> '+rp.CALLE:''}</div>
    <div class="rest-popup-area">${cp.CORR_NOMB||''} · ${cp.DIST_NOMB||''} · ${cp.PROV_NOMB||''}</div>
    <div class="rest-popup-section">Entorno del restaurante</div>
    <div class="rest-popup-grid">
@@ -450,7 +477,7 @@ function restaurantAreaPopup(r){
 
  return `<div class="rest-popup">
   <div class="rest-popup-name">🍽️ ${nombre}</div>
-  <div class="rest-popup-muted">${rp.DIRECCION||rp.CALLE||''}</div>
+  <div class="rest-popup-muted"><b>Categoría:</b> ${rp.CATEGORIA||'Sin categoría'}${rp.CALLE?'<br><b>Calle / referencia:</b> '+rp.CALLE:''}</div>
 
   <div class="rest-popup-section">Ubicación</div>
   <div class="rest-popup-grid">
@@ -473,6 +500,7 @@ function restaurantAreaPopup(r){
   </div>
 
   <div class="rest-popup-section">Actividad gastronómica del lugar poblado</div>
+  <div class="rest-popup-muted">Filtro estadístico: <b>${selectedCategory()||'Todas las categorías'}</b></div>
   <div class="rest-popup-grid">
    <div><span>Restaurantes</span><b>${fmtN(rsPob.length)}</b></div>
    <div><span>Área</span><b>${area===null?'—':area.toLocaleString('es-PA',{maximumFractionDigits:2})+' km²'}</b></div>
@@ -490,7 +518,7 @@ function restaurantAreaPopup(r){
     <div class="market-item"><span>Densidad gastronómica</span><strong>${pot.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
     <div class="market-item"><span>Referencia</span><strong style="font-size:10px">${p.DIST_NOMB||'Distrito'}</strong></div>
    </div>
-   <div class="potential-note">Índice exploratorio del lugar poblado, relativo a los demás lugares poblados del distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². No representa ventas ni gasto efectivo.</div>
+   <div class="potential-note">Índice exploratorio del lugar poblado, relativo a los demás lugares poblados del distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². Si se selecciona una categoría, los componentes gastronómicos se recalculan para esa categoría. No representa ventas ni gasto efectivo.</div>
   </div>
 
   <div class="rest-popup-section">Entorno del restaurante</div>
@@ -572,7 +600,7 @@ function potentialHtml(f){
    <div class="market-item"><span>Densidad gastronómica</span><strong>${m.densityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</strong></div>
    <div class="market-item"><span>Referencia</span><strong style="font-size:10px">${f.properties.DIST_NOMB||'Distrito'}</strong></div>
   </div>
-  <div class="potential-note">Índice exploratorio relativo al distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². Sirve para comparación territorial; no representa ventas ni gasto efectivo.</div>
+  <div class="potential-note">Índice exploratorio relativo al distrito: 60% ingreso mediano, 25% cantidad de restaurantes y 15% restaurantes/km². Si se selecciona una categoría, los componentes gastronómicos se recalculan para esa categoría. No representa ventas ni gasto efectivo.</div>
  </div>`;
 }
 
@@ -731,8 +759,35 @@ function openChart(){
   }
  });
 }
+
+function applyCategoryFilter(){
+ // Recalculate gastronomic indicators without changing income/population data.
+ if(selectedFeature){
+  selectFeature(selectedFeature,selectedLayer,false);
+  renderRestaurants(restaurantsForCorr(selectedFeature));
+ }else{
+  const c=$('corr').value,d=$('dist').value,pv=$('prov').value;
+  if(c){
+   const f=data.features.find(x=>code(x.properties.CORR_CODE)===c);
+   if(f){
+    let target=null;
+    if(layer)layer.eachLayer(l=>{if(code(l.feature.properties.CORR_CODE)===c)target=l});
+    selectFeature(f,target,false);
+    renderRestaurants(restaurantsForCorr(f));
+   }
+  }else if(d){
+   renderRestaurants(restaurantsForDistrict(d));
+  }else if(pv){
+   renderRestaurants(restaurantsForProvince(pv));
+  }else{
+   renderRestaurants(restaurantsForPolygons(data.features));
+  }
+ }
+ updateRestaurantSearch();
+}
+
 function reset(){
- selectedFeature=null;selectedLayer=null;$('prov').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
+ selectedFeature=null;selectedLayer=null;$('prov').value='';$('categoria').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants(restaurantsForPolygons(data.features));
 }
@@ -745,6 +800,7 @@ function switchBase(name){
  if(restaurantLayer)restaurantLayer.bringToFront();
 }
 
+$('categoria').addEventListener('change',applyCategoryFilter);
 $('prov').addEventListener('change',loadDistricts);$('dist').addEventListener('change',loadCorrs);$('corr').addEventListener('change',chooseCorr);
 $('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('active')});
@@ -786,7 +842,9 @@ Promise.all([
  // Filtro espacial dinámico:
  // solo quedan visibles/seleccionables los corregimientos que contienen
  // al menos un punto de restaurantes.geojson.
- const activeFeatures=allData.features.filter(f=>restaurantsForCorr(f).length>0);
+ const activeFeatures=allData.features.filter(f=>
+  restaurantData.features.some(r=>pointInFeature(r,f))
+ );
  data={type:'FeatureCollection',features:activeFeatures};
 
  // Solo se dibujan puntos que realmente caen dentro de algún corregimiento activo.
@@ -796,6 +854,7 @@ Promise.all([
  minMed=meds.length?Math.min(...meds):0;
  maxMed=meds.length?Math.max(...meds):1;
 
+ populateCategories();
  populateProvinces();
  render();
  renderRestaurants(restaurantesDentro);
