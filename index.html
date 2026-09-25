@@ -104,6 +104,7 @@ style="position:absolute;top:8px;right:8px;z-index:20;width:32px;height:32px;bor
  </div>
  <div class="row">
    <button class="btn-chart" id="chartBtn" disabled>📊 Gráfica</button>
+   <button class="btn-reset" id="backBtn" disabled>↩️ Regresar</button>
    <button class="btn-reset" id="reset">🔄 Reset</button>
  </div>
  <div class="box">
@@ -254,13 +255,21 @@ function selectFeature(f,l,fromMap=false){
  const b=L.geoJSON(f).getBounds();if(b.isValid())map.fitBounds(b,{padding:[45,45],maxZoom:12});
 }
 
+function categoryKey(v){
+ return String(v??'')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g,'')
+  .replace(/\s+/g,' ')
+  .trim()
+  .toLowerCase();
+}
 function selectedCategory(){
  return $('categoria')?String($('categoria').value||'').trim():'';
 }
 function matchesCategory(r){
- const sel=selectedCategory();
+ const sel=categoryKey(selectedCategory());
  if(!sel)return true;
- return String(r?.properties?.CATEGORIA??'').trim()===sel;
+ return categoryKey(r?.properties?.CATEGORIA)===sel;
 }
 function filterByCategory(rests){
  return (rests||[]).filter(matchesCategory);
@@ -268,11 +277,15 @@ function filterByCategory(rests){
 function populateCategories(){
  const sel=$('categoria');
  if(!sel||!restaurantData)return;
- const cats=[...new Set(
-  restaurantData.features
-   .map(r=>String(r.properties?.CATEGORIA??'').trim())
-   .filter(Boolean)
- )].sort((a,b)=>a.localeCompare(b,'es'));
+ const byKey=new Map();
+ restaurantData.features.forEach(r=>{
+  const raw=String(r.properties?.CATEGORIA??'').replace(/\s+/g,' ').trim();
+  const key=categoryKey(raw);
+  if(raw&&key&&!byKey.has(key))byKey.set(key,raw);
+ });
+ const cats=[...byKey.values()].sort((a,b)=>
+  a.localeCompare(b,'es',{sensitivity:'base',numeric:true})
+ );
  sel.innerHTML='<option value="">Todas las categorías</option>';
  cats.forEach(c=>{
   const o=document.createElement('option');
@@ -299,22 +312,22 @@ function restaurantsForDistrict(distCode){
 function loadDistricts(){
  const pv=$('prov').value;$('dist').disabled=true;$('corr').disabled=true;
  $('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
- if(!pv){render();renderRestaurants();return}
+ if(!pv){render();renderRestaurants();updateBackButton();return}
  fill($('dist'),unique('DIST_CODE',f=>code(f.properties.PROV_ID)===pv),'DIST_CODE','DIST_NOMB',2);
  render(data.features.filter(f=>code(f.properties.PROV_ID)===pv));
- renderRestaurants(restaurantsForProvince(pv));
+ renderRestaurants(restaurantsForProvince(pv));updateBackButton();
 }
 function loadCorrs(){
  const d=$('dist').value;$('corr').disabled=true;$('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
  if(!d){loadDistricts();return}
  fill($('corr'),unique('CORR_CODE',f=>code(f.properties.DIST_CODE)===d),'CORR_CODE','CORR_NOMB',2);
  render(data.features.filter(f=>code(f.properties.DIST_CODE)===d));
- renderRestaurants(restaurantsForDistrict(d));
+ renderRestaurants(restaurantsForDistrict(d));updateBackButton();
 }
 function chooseCorr(){
  const c=$('corr').value;if(!c){loadCorrs();return}
  const f=data.features.find(x=>code(x.properties.CORR_CODE)===c);if(!f)return;
- let target=null;layer.eachLayer(l=>{if(code(l.feature.properties.CORR_CODE)===c)target=l});selectFeature(f,target,false);
+ let target=null;layer.eachLayer(l=>{if(code(l.feature.properties.CORR_CODE)===c)target=l});selectFeature(f,target,false);updateBackButton();
 }
 
 function pointInFeature(pointFeature, polygonFeature){
@@ -612,6 +625,7 @@ function marketHtml(f){
  const distTotal=districtRestaurantCount(f);
  const share=distTotal?rs.length/distTotal*100:null;
  return `<div class="market-card"><b>🍽️ Actividad gastronómica</b>
+ <div style="margin:4px 0 6px;color:#475569">Categoría analizada: <b>${selectedCategory()||'Todas las categorías'}</b></div>
  <div class="market-grid">
   <div class="market-item"><span>Restaurantes</span><strong>${fmtN(rs.length)}</strong></div>
   <div class="market-item"><span>Rest./km²</span><strong>${dens===null?'—':dens.toLocaleString('es-PA',{maximumFractionDigits:2})}</strong></div>
@@ -650,6 +664,7 @@ function selectRestaurant(r){
  },0);
  $('restaurantResults').style.display='none';
  $('restaurantSearch').value=r.properties?.NOMBRE_EST||'';
+ updateBackButton();
 }
 function updateRestaurantSearch(){
  const box=$('restaurantResults');
@@ -682,7 +697,7 @@ function openChart(){
  const rs=restaurantsForCorr(selectedFeature);
  const distTotal=districtRestaurantCount(selectedFeature);
  $('chartTitle').textContent='Potencial de mercado gastronómico';
- $('chartSub').textContent=(p.CORR_NOMB||'')+' · '+(p.DIST_NOMB||'')+' · '+(p.PROV_NOMB||'');
+ $('chartSub').textContent=(p.CORR_NOMB||'')+' · '+(p.DIST_NOMB||'')+' · '+(p.PROV_NOMB||'')+' · Categoría: '+(selectedCategory()||'Todas');
  $('modal').classList.add('active');
 
  if(chart)chart.destroy();
@@ -761,35 +776,96 @@ function openChart(){
 }
 
 function applyCategoryFilter(){
- // Recalculate gastronomic indicators without changing income/population data.
- if(selectedFeature){
-  selectFeature(selectedFeature,selectedLayer,false);
-  renderRestaurants(restaurantsForCorr(selectedFeature));
- }else{
-  const c=$('corr').value,d=$('dist').value,pv=$('prov').value;
-  if(c){
-   const f=data.features.find(x=>code(x.properties.CORR_CODE)===c);
-   if(f){
-    let target=null;
-    if(layer)layer.eachLayer(l=>{if(code(l.feature.properties.CORR_CODE)===c)target=l});
-    selectFeature(f,target,false);
-    renderRestaurants(restaurantsForCorr(f));
-   }
-  }else if(d){
-   renderRestaurants(restaurantsForDistrict(d));
-  }else if(pv){
-   renderRestaurants(restaurantsForProvince(pv));
-  }else{
-   renderRestaurants(restaurantsForPolygons(data.features));
+ const c=$('corr').value,d=$('dist').value,pv=$('prov').value;
+
+ if(c){
+  const f=data.features.find(x=>code(x.properties.CORR_CODE)===code(c));
+  if(f){
+   let target=null;
+   if(layer)layer.eachLayer(l=>{
+    if(code(l.feature.properties.CORR_CODE)===code(c))target=l;
+   });
+   selectFeature(f,target,false);
+   renderRestaurants(restaurantsForCorr(f));
   }
+ }else if(d){
+  selectedFeature=null;selectedLayer=null;
+  render(data.features.filter(f=>code(f.properties.DIST_CODE)===code(d)));
+  renderRestaurants(restaurantsForDistrict(d));
+ }else if(pv){
+  selectedFeature=null;selectedLayer=null;
+  render(data.features.filter(f=>code(f.properties.PROV_ID)===code(pv)));
+  renderRestaurants(restaurantsForProvince(pv));
+ }else{
+  selectedFeature=null;selectedLayer=null;
+  render();
+  renderRestaurants(restaurantsForPolygons(data.features));
  }
+
  updateRestaurantSearch();
+ updateBackButton();
+}
+
+
+function updateBackButton(){
+ const b=$('backBtn');
+ if(!b)return;
+ b.disabled=!($('corr').value||$('dist').value||$('prov').value);
+}
+
+function goBack(){
+ const c=$('corr').value;
+ const d=$('dist').value;
+ const pv=$('prov').value;
+
+ if(c){
+  // Corregimiento -> Distrito
+  selectedFeature=null;selectedLayer=null;
+  $('corr').value='';
+  $('chartBtn').disabled=true;
+  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';
+  render(data.features.filter(f=>code(f.properties.DIST_CODE)===d));
+  renderRestaurants(restaurantsForDistrict(d));
+  const feats=data.features.filter(f=>code(f.properties.DIST_CODE)===d);
+  if(feats.length){
+   const temp=L.geoJSON({type:'FeatureCollection',features:feats});
+   const b=temp.getBounds();if(b.isValid())map.fitBounds(b,{padding:[25,25]});
+  }
+ }else if(d){
+  // Distrito -> Provincia
+  selectedFeature=null;selectedLayer=null;
+  $('dist').value='';
+  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
+  $('corr').disabled=true;
+  $('chartBtn').disabled=true;
+  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';
+  render(data.features.filter(f=>code(f.properties.PROV_ID)===pv));
+  renderRestaurants(restaurantsForProvince(pv));
+  const feats=data.features.filter(f=>code(f.properties.PROV_ID)===pv);
+  if(feats.length){
+   const temp=L.geoJSON({type:'FeatureCollection',features:feats});
+   const b=temp.getBounds();if(b.isValid())map.fitBounds(b,{padding:[25,25]});
+  }
+ }else if(pv){
+  // Provincia -> Vista nacional
+  selectedFeature=null;selectedLayer=null;
+  $('prov').value='';
+  $('dist').innerHTML='<option value="">Seleccionar distrito...</option>';
+  $('dist').disabled=true;
+  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';
+  $('corr').disabled=true;
+  $('chartBtn').disabled=true;
+  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';
+  render();
+  renderRestaurants(restaurantsForPolygons(data.features));
+ }
+ updateBackButton();
 }
 
 function reset(){
  selectedFeature=null;selectedLayer=null;$('prov').value='';$('categoria').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
- $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants(restaurantsForPolygons(data.features));
+ $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants(restaurantsForPolygons(data.features));updateBackButton();
 }
 function switchBase(name){
  Object.values(base).forEach(x=>map.removeLayer(x));
@@ -800,9 +876,12 @@ function switchBase(name){
  if(restaurantLayer)restaurantLayer.bringToFront();
 }
 
-$('categoria').addEventListener('change',applyCategoryFilter);
+$('categoria').addEventListener('change',()=>{
+ console.log('Categoría seleccionada:',selectedCategory()||'Todas las categorías');
+ applyCategoryFilter();
+});
 $('prov').addEventListener('change',loadDistricts);$('dist').addEventListener('change',loadCorrs);$('corr').addEventListener('change',chooseCorr);
-$('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
+$('backBtn').addEventListener('click',goBack);$('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('active')});
 $('sat').addEventListener('click',()=>switchBase('satellite'));$('street').addEventListener('click',()=>switchBase('street'));
 $('restToggle').addEventListener('click',()=>{
@@ -857,6 +936,7 @@ Promise.all([
  populateCategories();
  populateProvinces();
  render();
+ updateBackButton();
  renderRestaurants(restaurantesDentro);
 
  $('restToggle').style.background='#f59e0b';$('restToggle').style.color='white';
