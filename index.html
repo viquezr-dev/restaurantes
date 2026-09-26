@@ -79,7 +79,43 @@ canvas{max-height:420px}
 </style>
 </head>
 <body>
-<div id="map"></div><div id="potentialHelpModal" class="potential-help-overlay" aria-hidden="true"><div class="potential-help-card"><div class="potential-help-head"><div><div class="potential-help-title">¿Qué significan los indicadores?</div><div class="potential-help-sub">Guía rápida para interpretar el análisis</div></div><button id="closePotentialHelp" type="button" class="potential-help-close">✕</button></div><div class="potential-help-body"><div class="potential-help-item"><div class="potential-help-name">🍽️ Cantidad relativa de restaurantes</div><p>Compara la cantidad de restaurantes del corregimiento con los demás corregimientos del mismo distrito. Se expresa en una escala de 0 a 100: un valor más alto indica una mayor cantidad relativa de restaurantes dentro de ese distrito.</p></div><div class="potential-help-item"><div class="potential-help-name">📈 Índice exploratorio de potencial gastronómico</div><p>Es un indicador comparativo que combina tres componentes: <b>60% capacidad económica</b> (ingreso mediano), <b>25% cantidad relativa de restaurantes</b> y <b>15% densidad gastronómica</b> (restaurantes por km²).</p><p>El resultado se expresa de 0 a 100 y sirve para comparar territorialmente los corregimientos del mismo distrito. <b>No representa ventas, ganancias ni gasto efectivo en restaurantes.</b></p></div></div></div></div><div id="restaurantSearchBox">
+<div id="map"></div><div id="potentialHelpModal" class="potential-help-overlay" aria-hidden="true"><div class="potential-help-card"><div class="potential-help-head"><div><div class="potential-help-title">¿Qué significan los indicadores?</div><div class="potential-help-sub">Guía rápida para interpretar el análisis</div></div><button id="closePotentialHelp" type="button" class="potential-help-close">✕</button></div><div class="potential-help-body">
+<div class="potential-help-item">
+ <div class="potential-help-name">💰 Capacidad económica</div>
+ <p>Utiliza el <b>ingreso mediano</b> del territorio y lo normaliza entre 0 y 100 tomando como referencia los territorios del mismo distrito.</p>
+ <p><b>Fórmula:</b> Capacidad económica = 100 × (Ingreso mediano − Ingreso mediano mínimo) / (Ingreso mediano máximo − Ingreso mediano mínimo).</p>
+</div>
+<div class="potential-help-item">
+ <div class="potential-help-name">🍽️ Cantidad relativa de restaurantes</div>
+ <p>Compara la cantidad de restaurantes del territorio con los demás territorios del mismo distrito. Si se selecciona una categoría, solamente se cuentan los restaurantes de esa categoría.</p>
+ <p><b>Fórmula:</b> Cantidad relativa = 100 × (N.º restaurantes − N.º mínimo) / (N.º máximo − N.º mínimo).</p>
+</div>
+<div class="potential-help-item">
+ <div class="potential-help-name">📍 Densidad gastronómica</div>
+ <p>Mide la concentración espacial de restaurantes en relación con la superficie del territorio.</p>
+ <p><b>Fórmula:</b> Densidad gastronómica = N.º de restaurantes / Área (km²).</p>
+ <p>Para incorporarla al índice, esta densidad también se normaliza de 0 a 100 respecto a los territorios del mismo distrito.</p>
+</div>
+<div class="potential-help-item">
+ <div class="potential-help-name">📊 Participación de restaurantes en el distrito</div>
+ <p>Indica qué porcentaje de los restaurantes del distrito se encuentra en el corregimiento seleccionado. El cálculo respeta la categoría activa.</p>
+ <p><b>Fórmula:</b> Participación (%) = (Restaurantes del corregimiento / Restaurantes del distrito) × 100.</p>
+</div>
+<div class="potential-help-item">
+ <div class="potential-help-name">📈 Índice exploratorio de potencial gastronómico</div>
+ <p>Combina los tres componentes normalizados. El ingreso mediano tiene el mayor peso y los otros dos componentes representan la presencia y concentración de la actividad gastronómica.</p>
+ <p><b>Fórmula principal:</b> Índice = (0.60 × Capacidad económica) + (0.25 × Cantidad relativa de restaurantes) + (0.15 × Densidad gastronómica normalizada).</p>
+ <p><b>Clasificación:</b> 0–19.9 Muy bajo · 20–39.9 Bajo · 40–59.9 Medio · 60–79.9 Alto · 80–100 Muy alto.</p>
+ <p>Cuando se selecciona una categoría, se mantienen los datos socioeconómicos del territorio, pero la cantidad de restaurantes y la densidad gastronómica se recalculan exclusivamente con esa categoría.</p>
+ <p><b>Importante:</b> es un índice exploratorio para comparación territorial; no representa ventas, ganancias ni gasto efectivo en restaurantes.</p>
+</div>
+<div class="potential-help-item">
+ <div class="potential-help-name">🏘️ Indicadores del lugar poblado</div>
+ <p>En la ventana emergente de cada restaurante se utilizan los datos del lugar poblado que contiene espacialmente el punto.</p>
+ <p><b>Restaurantes/km² = N.º de restaurantes del lugar poblado / Área del lugar poblado (km²).</b></p>
+ <p>Los conteos de restaurantes a <b>500 m</b> y <b>1 km</b>, así como la distancia al restaurante más cercano, se calculan desde la ubicación geográfica del establecimiento. Si existe una categoría seleccionada, estos conteos consideran esa categoría.</p>
+</div>
+</div></div></div><div id="restaurantSearchBox">
  <div class="restaurant-search-title">🔎 Buscar restaurante</div>
  <div class="restaurant-search-row">
   <input id="restaurantSearch" type="search" placeholder="Escriba el nombre del restaurante..." autocomplete="off">
