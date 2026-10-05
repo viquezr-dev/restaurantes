@@ -550,20 +550,6 @@ function restaurantAreaPopup(r){
   <div class="rest-popup-name">🍽️ ${nombre}</div>
   <div class="rest-popup-muted"><b>Categoría:</b> ${rp.CATEGORIA||'Sin categoría'}${rp.CALLE?'<br><b>Calle / referencia:</b> '+rp.CALLE:''}</div>
 
-  <div class="rest-popup-section">Resultado exploratorio</div>
-  <div class="rest-popup-score">
-   <span>Factibilidad de ubicación</span>
-   <b>${feasibility.score===null?'—':feasibility.score.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}</b>
-  </div>
-  <div style="font-size:11px;font-weight:800;margin-bottom:7px">${feasibility.label}</div>
-  <div class="rest-popup-grid">
-   <div><span>Capacidad económica (35%)</span><b>${feasibility.incomeScore===null?'—':feasibility.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
-   <div><span>Población (25%)</span><b>${feasibility.popScore===null?'—':feasibility.popScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
-   <div><span>Oportunidad competitiva (20%)</span><b>${feasibility.competitionScore===null?'—':feasibility.competitionScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
-   <div><span>Separación competitiva (10%)</span><b>${feasibility.proximityScore===null?'—':feasibility.proximityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
-   <div><span>Cobertura de datos (10%)</span><b>${feasibility.coverageScore===null?'—':feasibility.coverageScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
-  </div>
-
   <div class="rest-popup-section">Ubicación</div>
   <div class="rest-popup-grid">
    <div><span>Provincia</span><b>${p.PROV_NOMB||cp.PROV_NOMB||'—'}</b></div>
@@ -742,6 +728,20 @@ function territoryPopup(latlng,radius){
  return `<div class="rest-popup">
   <div class="rest-popup-name">📍 Estimación exploratoria de factibilidad</div>
   <div class="rest-popup-muted">Radio analizado: <b>${radius} m</b> · Categoría: <b>${selectedCategory()||'Todas las categorías'}</b></div>
+
+  <div class="rest-popup-section">Resultado exploratorio</div>
+  <div class="rest-popup-score">
+   <span>Factibilidad de ubicación</span>
+   <b>${feasibility.score===null?'—':feasibility.score.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}</b>
+  </div>
+  <div style="font-size:11px;font-weight:800;margin:0 0 7px">${feasibility.label}</div>
+  <div class="rest-popup-grid">
+   <div><span>Capacidad económica · 35%</span><b>${feasibility.incomeScore===null?'—':feasibility.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Población · 25%</span><b>${feasibility.popScore===null?'—':feasibility.popScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Oportunidad competitiva · 20%</span><b>${feasibility.competitionScore===null?'—':feasibility.competitionScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Separación competitiva · 10%</span><b>${feasibility.proximityScore===null?'—':feasibility.proximityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Cobertura de datos · 10%</span><b>${feasibility.coverageScore===null?'—':feasibility.coverageScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+  </div>
 
   <div class="rest-popup-section">Ubicación</div>
   <div class="rest-popup-grid">
