@@ -110,10 +110,13 @@ canvas{max-height:420px}
  <p><b>Importante:</b> es un índice exploratorio para comparación territorial; no representa ventas, ganancias ni gasto efectivo en restaurantes.</p>
 </div>
 <div class="potential-help-item">
- <div class="potential-help-name">📍 Evaluación de territorio abierto</div>
- <p>Permite seleccionar un radio de <b>300, 400 o 500 metros</b> y hacer clic en cualquier punto del mapa, aunque no exista un restaurante allí.</p>
+ <div class="potential-help-name">📍 Estimación exploratoria de factibilidad</div>
+ <p>Permite seleccionar un radio de <b>300, 400 o 500 metros</b> y hacer clic en cualquier punto del mapa, aunque no exista un restaurante allí. Genera una estimación exploratoria de factibilidad de ubicación entre 0 y 100.</p>
  <p>La herramienta identifica espacialmente el lugar poblado y muestra habitantes, ingreso mediano, ingreso promedio, cobertura de respuesta, restaurantes dentro del radio y distancia al restaurante más cercano.</p>
- <p><b>Área del radio = π × radio².</b> Para expresarla en km² se divide entre 1,000,000. <b>Densidad del radio = restaurantes dentro del radio / área del círculo en km².</b></p>
+ <p><b>Fórmula de factibilidad:</b> (35% capacidad económica) + (25% población) + (20% oportunidad competitiva) + (10% separación competitiva) + (10% cobertura de datos).</p>
+<p><b>Clasificación:</b> 0–19.9 Muy baja · 20–39.9 Baja · 40–59.9 Moderada · 60–79.9 Favorable · 80–100 Muy favorable.</p>
+<p>Es una estimación territorial exploratoria. No sustituye un estudio financiero con alquiler, inversión, costos, ventas, precios, aforo y márgenes.</p>
+<p><b>Área del radio = π × radio².</b> Para expresarla en km² se divide entre 1,000,000. <b>Densidad del radio = restaurantes dentro del radio / área del círculo en km².</b></p>
  <p>El filtro de categoría también se aplica a los restaurantes contados dentro del radio y a la búsqueda del restaurante más cercano.</p>
 </div>
 <div class="potential-help-item">
@@ -154,7 +157,7 @@ style="position:absolute;top:8px;right:8px;z-index:20;width:32px;height:32px;bor
      <option value="500" selected>500 m</option>
     </select>
    </div>
-   <button class="btn-street" id="evalTerritory" style="flex:1">📍 Evaluar territorio</button>
+   <button class="btn-street" id="evalTerritory" style="flex:1">📍 Estimar factibilidad</button>
  </div>
  <div class="row">
    <button class="btn-chart" id="chartBtn" disabled>📊 Gráfica</button>
@@ -547,6 +550,20 @@ function restaurantAreaPopup(r){
   <div class="rest-popup-name">🍽️ ${nombre}</div>
   <div class="rest-popup-muted"><b>Categoría:</b> ${rp.CATEGORIA||'Sin categoría'}${rp.CALLE?'<br><b>Calle / referencia:</b> '+rp.CALLE:''}</div>
 
+  <div class="rest-popup-section">Resultado exploratorio</div>
+  <div class="rest-popup-score">
+   <span>Factibilidad de ubicación</span>
+   <b>${feasibility.score===null?'—':feasibility.score.toLocaleString('es-PA',{maximumFractionDigits:1})+' / 100'}</b>
+  </div>
+  <div style="font-size:11px;font-weight:800;margin-bottom:7px">${feasibility.label}</div>
+  <div class="rest-popup-grid">
+   <div><span>Capacidad económica (35%)</span><b>${feasibility.incomeScore===null?'—':feasibility.incomeScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Población (25%)</span><b>${feasibility.popScore===null?'—':feasibility.popScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Oportunidad competitiva (20%)</span><b>${feasibility.competitionScore===null?'—':feasibility.competitionScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Separación competitiva (10%)</span><b>${feasibility.proximityScore===null?'—':feasibility.proximityScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+   <div><span>Cobertura de datos (10%)</span><b>${feasibility.coverageScore===null?'—':feasibility.coverageScore.toLocaleString('es-PA',{maximumFractionDigits:0})}</b></div>
+  </div>
+
   <div class="rest-popup-section">Ubicación</div>
   <div class="rest-popup-grid">
    <div><span>Provincia</span><b>${p.PROV_NOMB||cp.PROV_NOMB||'—'}</b></div>
@@ -639,11 +656,79 @@ function nearestRestaurantFromLatLng(latlng){
  });
  return {feature,distance};
 }
+
+function feasibilityEstimate(latlng,radius,pob){
+ const pp=pob?.properties||{};
+ if(!pob)return {score:null,label:'Sin datos territoriales',incomeScore:null,popScore:null,competitionScore:null,proximityScore:null,coverageScore:null};
+
+ // Reference group: lugares poblados in the same district.
+ const distCode=code(pp.DIST_CODE)||code(pp.PROV_ID)+code(pp.DIST_ID);
+ const peers=(pobladoData?.features||[]).filter(x=>{
+  const xp=x.properties||{};
+  const xd=code(xp.DIST_CODE)||code(xp.PROV_ID)+code(xp.DIST_ID);
+  return xd===distCode;
+ });
+ const incomes=peers.map(x=>num(x.properties.ING_MED)).filter(v=>v!==null);
+ const pops=peers.map(x=>num(x.properties.N_TOTAL)).filter(v=>v!==null);
+ const med=num(pp.ING_MED), pop=num(pp.N_TOTAL);
+
+ const incomeScore=(med!==null&&incomes.length)
+  ?minmax(med,Math.min(...incomes),Math.max(...incomes)):0;
+ const popScore=(pop!==null&&pops.length)
+  ?minmax(pop,Math.min(...pops),Math.max(...pops)):0;
+
+ const local=territoryRestaurants(latlng,radius);
+ const nearest=nearestRestaurantFromLatLng(latlng);
+
+ // Competition opportunity: moderate presence is treated as evidence of an active
+ // gastronomic market, while very high concentration reduces the opportunity score.
+ // This is deliberately exploratory, not a financial profitability model.
+ const areaCircle=Math.PI*radius*radius/1000000;
+ const density=areaCircle>0?local.length/areaCircle:0;
+ const peerDensities=[];
+ (restaurantData?.features||[]).forEach(r=>{
+  if(!matchesCategory(r))return;
+  const rp=spatialPobladoForRestaurant(r);
+  if(!rp)return;
+  const xp=rp.properties||{};
+  const xd=code(xp.DIST_CODE)||code(xp.PROV_ID)+code(xp.DIST_ID);
+  if(xd===distCode){
+   const a=num(xp.AREA);
+   const n=restaurantsForPoblado(rp).length;
+   if(a&&a>0)peerDensities.push(n/a);
+  }
+ });
+ const maxD=peerDensities.length?Math.max(...peerDensities):Math.max(density,1);
+ const pressure=maxD>0?Math.max(0,Math.min(100,100*density/maxD)):0;
+ // Best exploratory opportunity around a middle level of observed competition.
+ const competitionScore=Math.max(0,100-Math.abs(pressure-50)*2);
+
+ const nd=nearest.distance;
+ let proximityScore=50;
+ if(nd!==null){
+  // Very close competition lowers the score; some separation raises it.
+  proximityScore=Math.max(0,Math.min(100,(nd/Math.max(radius,1))*100));
+ }
+
+ const resp=num(pp.PCT_RESP);
+ const coverageScore=resp===null?0:Math.max(0,Math.min(100,resp));
+
+ const score=0.35*incomeScore+0.25*popScore+0.20*competitionScore+0.10*proximityScore+0.10*coverageScore;
+ let label='Muy baja';
+ if(score>=80)label='Muy favorable';
+ else if(score>=60)label='Favorable';
+ else if(score>=40)label='Moderada';
+ else if(score>=20)label='Baja';
+
+ return {score,incomeScore,popScore,competitionScore,proximityScore,coverageScore,label};
+}
+
 function territoryPopup(latlng,radius){
  const pob=spatialPobladoForLatLng(latlng);
  const corr=spatialCorrForLatLng(latlng);
  const local=territoryRestaurants(latlng,radius);
  const nearest=nearestRestaurantFromLatLng(latlng);
+ const feasibility=feasibilityEstimate(latlng,radius,pob);
  const pp=pob?.properties||{};
  const cp=corr?.properties||{};
  const areaCircle=Math.PI*radius*radius/1000000;
@@ -655,7 +740,7 @@ function territoryPopup(latlng,radius){
    :(nearest.distance/1000).toLocaleString('es-PA',{maximumFractionDigits:2})+' km');
 
  return `<div class="rest-popup">
-  <div class="rest-popup-name">📍 Evaluación de territorio abierto</div>
+  <div class="rest-popup-name">📍 Estimación exploratoria de factibilidad</div>
   <div class="rest-popup-muted">Radio analizado: <b>${radius} m</b> · Categoría: <b>${selectedCategory()||'Todas las categorías'}</b></div>
 
   <div class="rest-popup-section">Ubicación</div>
@@ -681,14 +766,14 @@ function territoryPopup(latlng,radius){
    <div><span>Restaurante más cercano</span><b>${nearestName}</b></div>
    <div><span>Distancia al más cercano</span><b>${nearestDist}</b></div>
   </div>
-  <div class="rest-popup-note">Herramienta exploratoria para evaluar una ubicación sin necesidad de que exista un restaurante en el punto. El círculo representa el radio seleccionado, no el tamaño de un establecimiento.</div>
+  <div class="rest-popup-note"><b>Estimación exploratoria:</b> orienta la comparación territorial con los datos disponibles. No constituye un estudio financiero ni garantiza rentabilidad. El círculo representa el radio seleccionado, no el tamaño de un establecimiento.</div>
  </div>`;
 }
 function setTerritoryEvaluation(active){
  territoryEvalActive=active;
  const b=$('evalTerritory');
  if(b){
-  b.textContent=active?'✕ Cancelar evaluación':'📍 Evaluar territorio';
+  b.textContent=active?'✕ Cancelar evaluación':'📍 Estimar factibilidad';
   b.style.background=active?'#dc2626':'';
   b.style.color=active?'white':'';
  }
