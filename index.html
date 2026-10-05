@@ -110,6 +110,13 @@ canvas{max-height:420px}
  <p><b>Importante:</b> es un índice exploratorio para comparación territorial; no representa ventas, ganancias ni gasto efectivo en restaurantes.</p>
 </div>
 <div class="potential-help-item">
+ <div class="potential-help-name">📍 Evaluación de territorio abierto</div>
+ <p>Permite seleccionar un radio de <b>300, 400 o 500 metros</b> y hacer clic en cualquier punto del mapa, aunque no exista un restaurante allí.</p>
+ <p>La herramienta identifica espacialmente el lugar poblado y muestra habitantes, ingreso mediano, ingreso promedio, cobertura de respuesta, restaurantes dentro del radio y distancia al restaurante más cercano.</p>
+ <p><b>Área del radio = π × radio².</b> Para expresarla en km² se divide entre 1,000,000. <b>Densidad del radio = restaurantes dentro del radio / área del círculo en km².</b></p>
+ <p>El filtro de categoría también se aplica a los restaurantes contados dentro del radio y a la búsqueda del restaurante más cercano.</p>
+</div>
+<div class="potential-help-item">
  <div class="potential-help-name">🏘️ Indicadores del lugar poblado</div>
  <p>En la ventana emergente de cada restaurante se utilizan los datos del lugar poblado que contiene espacialmente el punto.</p>
  <p><b>Restaurantes/km² = N.º de restaurantes del lugar poblado / Área del lugar poblado (km²).</b></p>
@@ -137,6 +144,17 @@ style="position:absolute;top:8px;right:8px;z-index:20;width:32px;height:32px;bor
    <button class="btn-street" id="sat">🛰️ Satélite</button>
    <button class="btn-sat" id="street">🌍 Callejero</button>
    <button class="btn-street" id="restToggle">🍽️ Restaurantes</button>
+ </div>
+ <div class="row" style="align-items:end">
+   <div style="flex:1">
+    <label style="margin-top:0">Radio de evaluación</label>
+    <select id="evalRadius">
+     <option value="300">300 m</option>
+     <option value="400">400 m</option>
+     <option value="500" selected>500 m</option>
+    </select>
+   </div>
+   <button class="btn-street" id="evalTerritory" style="flex:1">📍 Evaluar territorio</button>
  </div>
  <div class="row">
    <button class="btn-chart" id="chartBtn" disabled>📊 Gráfica</button>
@@ -207,6 +225,7 @@ base.street.addTo(map);
 
 let data=null, allData=null, restaurantData=null, pobladoData=null, layer=null, restaurantLayer=null, selectedLayer=null, selectedFeature=null, chart=null, chartRestaurants=null, chartPotential=null;
 let restaurantesVisibles=true;
+let territoryEvalActive=false, territoryEvalCircle=null, territoryEvalMarker=null;
 const $=id=>document.getElementById(id);
 const code=v=>String(v??'').trim();
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
@@ -581,6 +600,118 @@ function restaurantAreaPopup(r){
  </div>`;
 }
 
+
+function pointFeatureFromLatLng(latlng){
+ return {type:'Feature',properties:{},geometry:{type:'Point',coordinates:[latlng.lng,latlng.lat]}};
+}
+function spatialPobladoForLatLng(latlng){
+ if(!pobladoData)return null;
+ const pt=pointFeatureFromLatLng(latlng);
+ return pobladoData.features.find(f=>pointInFeature(pt,f))||null;
+}
+function spatialCorrForLatLng(latlng){
+ const source=allData||data;
+ if(!source)return null;
+ const pt=pointFeatureFromLatLng(latlng);
+ return source.features.find(f=>pointInFeature(pt,f))||null;
+}
+function distanceLatLngToRestaurant(latlng,r){
+ const c=restaurantCoords(r);
+ if(!c)return null;
+ return map.distance(latlng,L.latLng(c[0],c[1]));
+}
+function territoryRestaurants(latlng,radius){
+ if(!restaurantData)return[];
+ return restaurantData.features.filter(r=>{
+  if(!matchesCategory(r))return false;
+  const d=distanceLatLngToRestaurant(latlng,r);
+  return d!==null&&d<=radius;
+ });
+}
+function nearestRestaurantFromLatLng(latlng){
+ if(!restaurantData)return {feature:null,distance:null};
+ let feature=null,distance=null;
+ restaurantData.features.forEach(r=>{
+  if(!matchesCategory(r))return;
+  const d=distanceLatLngToRestaurant(latlng,r);
+  if(d===null)return;
+  if(distance===null||d<distance){distance=d;feature=r;}
+ });
+ return {feature,distance};
+}
+function territoryPopup(latlng,radius){
+ const pob=spatialPobladoForLatLng(latlng);
+ const corr=spatialCorrForLatLng(latlng);
+ const local=territoryRestaurants(latlng,radius);
+ const nearest=nearestRestaurantFromLatLng(latlng);
+ const pp=pob?.properties||{};
+ const cp=corr?.properties||{};
+ const areaCircle=Math.PI*radius*radius/1000000;
+ const density=areaCircle>0?local.length/areaCircle:null;
+ const nearestName=nearest.feature?.properties?.NOMBRE_EST||'—';
+ const nearestDist=nearest.distance===null?'—':
+  (nearest.distance<1000
+   ?nearest.distance.toLocaleString('es-PA',{maximumFractionDigits:0})+' m'
+   :(nearest.distance/1000).toLocaleString('es-PA',{maximumFractionDigits:2})+' km');
+
+ return `<div class="rest-popup">
+  <div class="rest-popup-name">📍 Evaluación de territorio abierto</div>
+  <div class="rest-popup-muted">Radio analizado: <b>${radius} m</b> · Categoría: <b>${selectedCategory()||'Todas las categorías'}</b></div>
+
+  <div class="rest-popup-section">Ubicación</div>
+  <div class="rest-popup-grid">
+   <div><span>Provincia</span><b>${pp.PROV_NOMB||cp.PROV_NOMB||'—'}</b></div>
+   <div><span>Distrito</span><b>${pp.DIST_NOMB||cp.DIST_NOMB||'—'}</b></div>
+   <div><span>Corregimiento</span><b>${pp.CORR_NOMB||cp.CORR_NOMB||'—'}</b></div>
+   <div><span>Lugar poblado</span><b>${pp.LUPO_NOMB||'—'}</b></div>
+  </div>
+
+  <div class="rest-popup-section">Contexto del lugar poblado</div>
+  <div class="rest-popup-grid">
+   <div><span>Habitantes</span><b>${fmtN(pp.N_TOTAL)}</b></div>
+   <div><span>Ingreso mediano</span><b>${fmtMoney(pp.ING_MED)}</b></div>
+   <div><span>Ingreso promedio</span><b>${fmtMoney(pp.ING_PROM)}</b></div>
+   <div><span>Respuesta</span><b>${fmtPct(pp.PCT_RESP)}</b></div>
+  </div>
+
+  <div class="rest-popup-section">Entorno del punto</div>
+  <div class="rest-popup-grid">
+   <div><span>Restaurantes dentro de ${radius} m</span><b>${fmtN(local.length)}</b></div>
+   <div><span>Densidad en el radio</span><b>${density===null?'—':density.toLocaleString('es-PA',{maximumFractionDigits:2})+' rest./km²'}</b></div>
+   <div><span>Restaurante más cercano</span><b>${nearestName}</b></div>
+   <div><span>Distancia al más cercano</span><b>${nearestDist}</b></div>
+  </div>
+  <div class="rest-popup-note">Herramienta exploratoria para evaluar una ubicación sin necesidad de que exista un restaurante en el punto. El círculo representa el radio seleccionado, no el tamaño de un establecimiento.</div>
+ </div>`;
+}
+function setTerritoryEvaluation(active){
+ territoryEvalActive=active;
+ const b=$('evalTerritory');
+ if(b){
+  b.textContent=active?'✕ Cancelar evaluación':'📍 Evaluar territorio';
+  b.style.background=active?'#dc2626':'';
+  b.style.color=active?'white':'';
+ }
+ map.getContainer().style.cursor=active?'crosshair':'';
+}
+function evaluateTerritoryAt(latlng){
+ const radius=Number($('evalRadius').value)||500;
+ if(territoryEvalCircle)map.removeLayer(territoryEvalCircle);
+ if(territoryEvalMarker)map.removeLayer(territoryEvalMarker);
+
+ territoryEvalCircle=L.circle(latlng,{
+  radius:radius,weight:2,fillOpacity:.10
+ }).addTo(map);
+
+ territoryEvalMarker=L.circleMarker(latlng,{
+  radius:6,weight:2,fillOpacity:1
+ }).addTo(map);
+
+ territoryEvalMarker.bindPopup(territoryPopup(latlng,radius),{maxWidth:420,minWidth:330}).openPopup();
+ territoryEvalCircle.bindPopup(territoryPopup(latlng,radius),{maxWidth:420,minWidth:330});
+ setTerritoryEvaluation(false);
+}
+
 function renderRestaurants(features=null){
  if(restaurantLayer){map.removeLayer(restaurantLayer);restaurantLayer=null}
  if(!restaurantData||!restaurantesVisibles)return;
@@ -899,6 +1030,9 @@ function goBack(){
 }
 
 function reset(){
+ if(territoryEvalCircle){map.removeLayer(territoryEvalCircle);territoryEvalCircle=null}
+ if(territoryEvalMarker){map.removeLayer(territoryEvalMarker);territoryEvalMarker=null}
+ setTerritoryEvaluation(false);
  selectedFeature=null;selectedLayer=null;$('prov').value='';$('categoria').value='';$('dist').innerHTML='<option value="">Seleccionar distrito...</option>';$('dist').disabled=true;
  $('corr').innerHTML='<option value="">Seleccionar corregimiento...</option>';$('corr').disabled=true;$('chartBtn').disabled=true;
  $('info').textContent='Selecciona un corregimiento en el menú o haz clic sobre un polígono.';render();renderRestaurants(restaurantsForPolygons(data.features));updateBackButton();
@@ -920,6 +1054,20 @@ $('prov').addEventListener('change',loadDistricts);$('dist').addEventListener('c
 $('backBtn').addEventListener('click',goBack);$('reset').addEventListener('click',reset);$('chartBtn').addEventListener('click',openChart);$('close').addEventListener('click',()=>$('modal').classList.remove('active'));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('active')});
 $('sat').addEventListener('click',()=>switchBase('satellite'));$('street').addEventListener('click',()=>switchBase('street'));
+$('evalTerritory').addEventListener('click',()=>{
+ setTerritoryEvaluation(!territoryEvalActive);
+});
+$('evalRadius').addEventListener('change',()=>{
+ if(territoryEvalCircle){
+  const ll=territoryEvalCircle.getLatLng();
+  evaluateTerritoryAt(ll);
+ }
+});
+map.on('click',e=>{
+ if(!territoryEvalActive)return;
+ evaluateTerritoryAt(e.latlng);
+});
+
 $('restToggle').addEventListener('click',()=>{
  restaurantesVisibles=!restaurantesVisibles;
  $('restToggle').style.background=restaurantesVisibles?'#f59e0b':'#e5e7eb';
